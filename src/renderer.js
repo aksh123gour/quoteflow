@@ -2441,8 +2441,25 @@ async function renderSettings() {
           <tr><td><kbd class="kbd">Esc</kbd></td><td>Close open modal or sidebar</td></tr>
           <tr><td><kbd class="kbd">Tab</kbd> / <kbd class="kbd">Shift</kbd>+<kbd class="kbd">Tab</kbd></td><td>Move focus between interactive elements</td></tr>
           <tr><td><kbd class="kbd">Enter</kbd></td><td>Activate the focused button or nav item</td></tr>
-        </tbody>
       </table>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <h3>🛡️ Data Security & Anti-Wipe Protection</h3>
+      <div class="settings-note" style="margin-bottom:12px;">
+        To prevent Android/iOS from wiping your data when deleting other PWAs or clearing browser cache, QuoteFlow uses <strong>Persistent Storage Locks</strong> and 1-Click Offline Backups.
+      </div>
+      <div style="background:var(--bg);padding:12px 14px;border-radius:8px;border:1px solid var(--border);margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+        <div>
+          <div style="font-weight:600;font-size:13px;" id="storage-status-title">Checking OS Protection Status…</div>
+          <div style="font-size:11.5px;color:var(--muted);margin-top:2px;" id="storage-status-desc">Persistent Storage prevents your phone from automatically deleting database records.</div>
+        </div>
+        <button class="btn" id="req-persist-btn" style="flex-shrink:0;">Protect Storage</button>
+      </div>
+      <div class="settings-actions" style="gap:10px;">
+        <button class="btn btn-primary" id="settings-export-backup-btn">⬇ Export Backup File (.qfbackup)</button>
+        <button class="btn" id="settings-import-backup-btn">⬆ Restore Backup File</button>
+      </div>
     </div>
 
     <div class="card danger-zone" style="margin-top:16px;">
@@ -2460,6 +2477,74 @@ async function renderSettings() {
       </div>
     </div>
   `;
+
+  // Storage persistence status check
+  const checkStorageProtection = async () => {
+    const titleEl = document.getElementById('storage-status-title');
+    const descEl = document.getElementById('storage-status-desc');
+    const reqBtn = document.getElementById('req-persist-btn');
+
+    if (!navigator.storage || !navigator.storage.persist) {
+      if (titleEl) titleEl.textContent = 'Storage API Not Supported';
+      if (descEl) descEl.textContent = 'Use 1-Click Backups to save copy to your device.';
+      if (reqBtn) reqBtn.style.display = 'none';
+      return;
+    }
+
+    const isPersisted = await navigator.storage.persisted();
+    if (isPersisted) {
+      if (titleEl) titleEl.innerHTML = '<span style="color:#146c3a;">✓ Protected: Storage Lock Active</span>';
+      if (descEl) descEl.textContent = 'Android & Chrome will NEVER clear this app\'s database during OS low-memory cleanup.';
+      if (reqBtn) {
+        reqBtn.textContent = 'Protected';
+        reqBtn.disabled = true;
+        reqBtn.style.background = '#e6f4ea';
+        reqBtn.style.color = '#137333';
+        reqBtn.style.borderColor = '#ceead6';
+      }
+    } else {
+      if (titleEl) titleEl.textContent = 'Storage Status: Best Effort (Unprotected)';
+      if (descEl) descEl.textContent = 'Tap Protect Storage to request persistent lock from Android/Chrome.';
+      if (reqBtn) {
+        reqBtn.onclick = async () => {
+          reqBtn.disabled = true;
+          reqBtn.textContent = 'Requesting…';
+          const granted = await navigator.storage.persist();
+          await checkStorageProtection();
+        };
+      }
+    }
+  };
+  checkStorageProtection();
+
+  // Export / Import Backup handlers in Settings
+  const exportBackupBtn = document.getElementById('settings-export-backup-btn');
+  if (exportBackupBtn) {
+    exportBackupBtn.onclick = async () => {
+      exportBackupBtn.disabled = true;
+      exportBackupBtn.textContent = 'Generating Backup…';
+      const result = await window.api.backup.create();
+      exportBackupBtn.textContent = result.success ? 'Backup Downloaded!' : 'Export Failed';
+      setTimeout(() => {
+        exportBackupBtn.disabled = false;
+        exportBackupBtn.textContent = '⬇ Export Backup File (.qfbackup)';
+      }, 2500);
+    };
+  }
+
+  const importBackupBtn = document.getElementById('settings-import-backup-btn');
+  if (importBackupBtn) {
+    importBackupBtn.onclick = () => {
+      openConfirm(
+        'Restoring from a backup will replace your current data with the contents of the backup file. Proceed?',
+        async () => {
+          await window.api.backup.restore();
+          renderSettings();
+        },
+        'Restore Backup'
+      );
+    };
+  }
 
   document.getElementById('pre-reset-backup-btn').onclick = async () => {
     const btn = document.getElementById('pre-reset-backup-btn');

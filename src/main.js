@@ -5,11 +5,17 @@ import { syncEngine } from './sync/sync.js';
 // 1. Ensure window.api is initialized
 window.api = buildWindowApi();
 
-// 2. Seed database defaults if first run
+// 2. Seed database defaults & request Persistent Storage lock from OS
 try {
   await seedDefaults();
 } catch (err) {
   console.error('[QuoteFlow] seedDefaults failed:', err);
+}
+
+if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.persist) {
+  navigator.storage.persist().then((isPersisted) => {
+    console.log(`[QuoteFlow] Persistent Storage: ${isPersisted ? 'GRANTED (Protected from OS eviction)' : 'NOT GRANTED'}`);
+  }).catch(() => {});
 }
 
 // 3. Setup PWA Install Prompt

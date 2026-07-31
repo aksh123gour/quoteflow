@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QuoteFlow — GST Quotation & Invoicing</title>
+  <meta name="description" content="Offline-first GST-compliant Quotation and Invoicing Management App">
+  <meta name="theme-color" content="#004ac6">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <link rel="icon" href="/icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <div class="sidebar-overlay hidden" id="sidebar-overlay"></div>
+    <aside class="sidebar" id="sidebar">
+      <div class="logo">
+        <button class="sidebar-close-btn" id="sidebar-close-btn" aria-label="Close sidebar">&times;</button>
+        QuoteFlow
+      </div>
+      <div class="company-switcher" id="company-switcher">
+        <button class="company-switcher-btn" id="company-switcher-btn">
+          <span id="active-company-name">Loading…</span>
+          <span class="company-switcher-arrow">&#9662;</span>
+        </button>
+        <div id="company-switcher-menu" class="company-switcher-menu hidden"></div>
+      </div>
+      <nav class="nav">
+        <button class="nav-item" data-view="dashboard">Dashboard</button>
+        <button class="nav-item" data-view="quotes">Quotes</button>
+        <button class="nav-item" data-view="invoices">Invoices</button>
+        <button class="nav-item" data-view="challans">Delivery Challans</button>
+        <button class="nav-item" data-view="notes">Credit/Debit Notes</button>
+        <button class="nav-item" data-view="customers">Customers</button>
+        <button class="nav-item" data-view="products">Products</button>
+        <button class="nav-item" data-view="reports">Reports</button>
+        <button class="nav-item" data-view="settings">Settings</button>
+      </nav>
+
+      <!-- Mobile bottom nav spacer -->
+      <div class="sidebar-footer">
+        <div class="sync-status-bar" id="sync-status-bar">
+          <span class="sync-dot" id="sync-dot"></span>
+          <span id="sync-status-text">Offline Mode</span>
+        </div>
+      </div>
+    </aside>
+
+    <main class="content">
+      <header class="topbar">
+        <button class="sidebar-toggle-btn" id="sidebar-toggle-btn" aria-label="Toggle Navigation Menu" title="Toggle Navigation Menu (Key: M)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+        </button>
+        <h1 id="view-title">Dashboard</h1>
+        <div class="global-search">
+          <input type="text" id="global-search-input" placeholder="Search customers, products, quotations… (Ctrl+K)">
+          <div id="global-search-results" class="search-results hidden"></div>
+        </div>
+        <div class="topbar-actions">
+          <button class="btn btn-sync" id="sync-btn" title="Sync across devices">⇄ Sync</button>
+          <button class="btn btn-install hidden" id="install-btn" title="Install as app">⬇ Install App</button>
+        </div>
+      </header>
+      <div id="view-root" class="view-root"></div>
+    </main>
+  </div>
+
+  <!-- Sync Panel Modal -->
+  <div id="sync-panel-overlay" class="modal-overlay hidden">
+    <div class="modal" id="sync-panel" style="width:480px">
+      <div class="modal-header">
+        <h2>📡 Device Sync</h2>
+        <button class="modal-close" id="sync-panel-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:13px;color:var(--muted);margin-bottom:16px">
+          Sync your QuoteFlow data between devices on the same network. Share your Sync Code or scan the QR code from your other device.
+        </p>
+        <div style="display:flex;gap:20px;align-items:flex-start">
+          <div style="flex:1">
+            <div class="form-group">
+              <label>Your Device Sync Code</label>
+              <div style="display:flex;gap:8px;align-items:center">
+                <input type="text" id="my-sync-code" readonly style="font-family:monospace;font-size:15px;font-weight:700;background:var(--bg)">
+                <button class="btn" id="copy-sync-code-btn" style="flex-shrink:0">Copy</button>
+              </div>
+            </div>
+            <div class="form-group" style="margin-top:14px">
+              <label>Connect to Another Device</label>
+              <div style="display:flex;gap:8px">
+                <input type="text" id="remote-sync-code" placeholder="Enter other device's code…" style="font-family:monospace">
+                <button class="btn btn-primary" id="connect-sync-btn" style="flex-shrink:0">Connect</button>
+              </div>
+            </div>
+            <div id="sync-message" style="margin-top:12px;font-size:12px;color:var(--muted)"></div>
+          </div>
+          <div id="sync-qr-container" style="width:130px;flex-shrink:0;text-align:center">
+            <div id="sync-qr-code" style="width:130px;height:130px;border:1px solid var(--border);border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:11px">Loading QR…</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:6px">Scan from other device</div>
+          </div>
+        </div>
+        <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
+          <div style="font-size:12px;font-weight:600;margin-bottom:10px;color:var(--muted)">BACKUP & RESTORE</div>
+          <div style="display:flex;gap:8px">
+            <button class="btn" id="backup-btn">⬇ Export Backup (.qfbackup)</button>
+            <button class="btn" id="restore-btn">⬆ Import Backup</button>
+          </div>
+          <input type="file" id="restore-file-input" accept=".qfbackup" style="display:none">
+          <div style="font-size:11px;color:var(--muted);margin-top:8px">Backups are full exports of all your QuoteFlow data as a portable JSON file.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PDF Preview Modal -->
+  <div id="pdf-preview-overlay" class="modal-overlay hidden">
+    <div class="modal" id="pdf-preview-modal" style="width:900px;max-height:92vh">
+      <div class="modal-header">
+        <h2 id="pdf-preview-title">Document Preview</h2>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn btn-primary" id="pdf-print-btn">🖨 Print / Save PDF</button>
+          <button class="modal-close" id="pdf-preview-close">&times;</button>
+        </div>
+      </div>
+      <div style="padding:0;overflow:auto;max-height:calc(92vh - 70px)">
+        <iframe id="pdf-preview-iframe" style="width:100%;height:75vh;border:none"></iframe>
+      </div>
+    </div>
+  </div>
+
+  <!-- Letterhead Upload Input (hidden) -->
+  <input type="file" id="letterhead-file-input" accept="image/png,image/jpeg" style="display:none">
+
+  <div id="modal-overlay" class="modal-overlay hidden">
+    <div class="modal" id="modal"></div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

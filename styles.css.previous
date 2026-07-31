@@ -1,0 +1,867 @@
+{
+  \"name\": \"quoteflow-pwa-v2\",
+  \"version\": \"0.0.0\",
+  \"private\": true,
+  \"type\": \"module\",
+  \"scripts\": {
+    \"dev\": \"vite\",
+    \"build\": \"vite build\",
+    \"preview\": \"vite preview\"
+  },
+  \"devDependencies\": {
+    \"vite\": \"^8.1.1\",
+    \"vite-plugin-pwa\": \"^1.3.0\"
+  },
+  \"dependencies\": {
+    \"dexie\": \"^4.4.4\",
+    \"peerjs\": \"^1.5.5\",
+    \"qrcode-svg\": \"^1.1.0\",
+    \"xlsx\": \"^0.18.5\"
+  }
+}
+
+        <div id=\"company-switcher-menu\" class=\"company-switcher-menu hidden\"></div>
+      </div>
+      <nav class=\"nav\">
+        <button class=\"nav-item\" data-view=\"dashboard\">Dashboard</button>
+        <button class=\"nav-item\" data-view=\"quotes\">Quotes</button>
+        <button class=\"nav-item\" data-view=\"invoices\">Invoices</button>
+        <button class=\"nav-item\" data-view=\"challans\">Delivery Challans</button>
+        <button class=\"nav-item\" data-view=\"notes\">Credit/Debit Notes</button>
+        <button class=\"nav-item\" data-view=\"cus
+  const row = await db.settings.get('active_company_id');
+  if (row && row.value) {
+    const exists = await db.companies.get(Number(row.value));
+    if (exists) return Number(row.value);
+  }
+  const first = await db.companies.orderBy('id').first();
+  if (first) {
+    await db.settings.put({ key: 'active_company_id', value: String(first.id) });
+    return first.id;
+  }
+  return null;
+}
+
+export async function getActiveCompany() {
+  const id = await getActiveCompanyId();
+  if (!id) return null;
+  return db.companies.get(id);
+}
+
+export async function seedSampleData() {
+  const companyCount = await db.companies.count();
+  let companyId;
+
+  if (companyCount === 0) {
+    companyId = await db.companies.add({
+      name: 'Apex Technologies India Pvt Ltd',
+      state: 'Madhya Pradesh',
+      gst_number: '23AAACA1234A1Z5',
+      address: '102 Business Park, M.G. Road, Indore, MP 452001',
+  modal.innerHTML = '';
+  modalOverlay.onclick = null;
+}
+
+function openConfirm(message, onConfirm, confirmLabel = 'Delete') {
+  openModal(`
+    <div class=\"modal-header\">
+      <h2>Please confirm</h2>
+      <button class=\"modal-close\">&times;</button>
+    </div>
+    <div class=\"confirm-body\">${escapeHtml(message)}</div>
+    <div class=\"modal-footer\">
+      <button class=\"btn modal-cancel\">Cancel</button>
+      <button class=\"btn btn-primary\" id=\"confirm-yes-btn\" style=\"background:var(--danger)\">${escapeHtml(confirmLabel)}</button>
+    </div>
+  `);
+              <label>Your Device Sync Code</label>
+              <div style=\"display:flex;gap:8px;align-items:center\">
+                <input type=\"text\" id=\"my-sync-code\" readonly style=\"font-family:monospace;font-size:15px;font-weight:700;background:var(--bg)\">
+                <button class=\"btn\" id=\"copy-sync-code-btn\" style=\"flex-shrink:0\">Copy</button>
+              </div>
+            </div>
+            <div class=\"form-group\" style=\"margin-top:14px\">
+              <label>Connect to Another Device</label>
+              <div style=\"display:flex;gap:8px\">
+                <input type=\"text\" id=\"remote-sync-code\" placeholder=\"Enter other device's code…\" style=\"font-family:monospace\">
+                <button class=\"btn btn-primary\" id=\"connect-sync-btn\" style=\"flex-shrink:0\">Connect</button>
+              </div>
+            </div>
+            <div id=\"sync-message\" style=\"margin-top:12px;font-size:12px;color:var(--muted)\"></div>
+          </div>
+          <div id=\"sync-qr-container\" style=\"width:130px;flex-shrink:0;text-align:center\">
+            <div id=\"sync-qr-code\" style=\"width:130px;height:130px;border:1px solid var(--border);border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:11px\">Loading QR…</div>
+            <div style=\"font-size:10px;color:var(--muted);margin-top:6px\">Scan from other device</div>
+          </div>
+        </div>
+        <div style=\"margin-top:20px;padding-top:16px;border-top:1px solid var(--border)\">
+          <div style=\"font-size:12px;font-weight:600;margin-bottom:10px;color:var(--muted)\">BACKUP & RESTORE</div>
+          <div style=\"display:flex;gap:8px\">
+            <button class=\"btn\" id=\"backup-btn\">⬇ Export Backup (.qfbackup)</button>
+.company-switcher-arrow { color: var(--muted); font-size: 10px; }
+
+.company-switcher-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 12px;
+  right: 12px;
+  background: var(--card);
+// ─── Customers ───────────────────────────────────────────────────────────────
+
+async function renderCustomers() {
+  const customers = await window.api.customers.list();
+
+  viewRoot.innerHTML = `
+    <div class=\"view-toolbar\">
+      <button class=\"btn btn-primary\" id=\"add-customer-btn\">+ Add Customer</button>
+    </div>
+    ${customers.length === 0
+      ? `<div class=\"empty-state\">No customers yet. Add your first one to get started.</div>`
+      : `<table class=\"data-table\">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Company</th>
+              <th>Category</th>
+              <th>Phone</th>
+              <th>GST Number</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${customers.map((c) => `
+              <tr>
+                <td>${escapeHtml(c.contact_name)}</td>
+                <td>${escapeHtml(c.company_name || '—')}</td>
+                <td>${escapeHtml(c.category_name || '—')}</td>
+                <td>${escapeHtml(c.phone || '—')}</td>
+                <td>${escapeHtml(c.gst_number || '—')}</td>
+                <td class=\"row-actions\">
+                  <button class=\"edit-customer\" data-id=\"${c.id}\">Edit</button>
+                  <button class=\"danger delete-customer\" data-id=\"${c.id}\">Delete</button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>`
+    }
+  `;
+
+  document.getElementById('add-customer-btn').onclick = () => openCustomerForm();
+      hsn_code: it.hsn_code || null,
+      qty: Number(it.qty),
+      unit_price: Number(it.unit_price),
+      gst_rate: Number(it.gst_rate) || 0,
+      line_total: round2(Number(it.qty) * Number(it.unit_price))
+    });
+  }
+}
+
+async function insertInvoiceItems(invoiceId, items) {
+  for (const it of items) {
+    await db.invoice_items.add({
+      invoice_id: invoiceId,
+      product_id: it.product_id || null,
+      description: it.description,
+      hsn_code: it.hsn_code || null,
+      qty: Number(it.qty),
+      unit_price: Number(it.unit_price),
+      gst_rate: Number(it.gst_rate) || 0,
+      line_total: round2(Number(it.qty) * Number(it.unit_price))
+    });
+  }
+}
+
+// ─── Build window.api ─────────────────────────────────────────────────────────
+
+export function buildWindowApi() {
+  const api = {
+
+    // ─── Companies ─────────────────────────────────────────────────────────
+
+    companies: {
+      list: async () => {
+        const activeId = await getActiveCompanyId();
+        const all = await db.companies.orderBy('name').toArray();
+        return all.map(c => ({ ...c, is_active: c.id === activeId }));
+      },
+      get: async (id) => db.companies.get(id),
+      create: async (data) => {
+        const id = await db.companies.add({
+          name: data.name || '',
+          trade_name: data.trade_name || null,
+          gst_number: data.gst_number || null,
+          state: data.state || null,
+          address: data.address || null,
+          pincode: data.pincode || null,
+          phone: data.phone || null,
+          email: data.email || null,
+          bank_name: data.bank_name || null,
+          account_number: data.account_number || null,
+          ifsc_code: data.ifsc_code || null,
+          branch: data.branch || null,
+          upi_id: data.upi_id || null,
+          theme_color: data.theme_color || '#004ac6',
+          created_at: new Date().toISOString()
+        });
+        return { id };
+      },
+      update: async (id, data) => {
+        await db.companies.update(id, {
+          name: data.name || '',
+          trade_name: data.trade_name || n
+.csm-preset:hover { border-color: rgba(0,0,0,0.25); transform: scale(1.15); }
+
+.color-swatch-row { display: flex; align-items: center; gap: 10px; }
+.color-swatch-row input[type=\"color\"] {
+  width: 40px;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px;
+  cursor: pointer;
+  background: var(--card);
+}
+
+/* Main content */
+.content { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+        await db.settings.put({ key: 'active_company_id', value: String(id) });
+        return { success: true };
+      },
+      delete: async (id) => {
+        const total = await db.companies.count();
+        if (total <= 1) return { success: false, reason: 'Cannot delete the only company profile.' };
+        const [cCount, pCount, qCount] = await Promise.all([
+          db.customers.where('company_id').equals(id).count(),
+          db.products.where('company_id').equals(id).count(),
+          db.quotations.where('company_id').equals(id).count()
+        ]);
+        if (cCount > 0 || pCount > 0 || qCount > 0) {
+          return { success: false, reason: 'This company has customers, products, or quotations on record and cannot be deleted.' };
+        }
+        await db.companies.delete(id);
+        const activeId = await getActiveCompanyId();
+        if (activeId === id) {
+          const first = await db.companies.orderBy('id').first();
+          if (first) await db.settings.put({ key: 'active_company_id', value: String(first.id) });
+        }
+        return { success: true };
+      }
+    },
+
+    company: {
+      get: async () => getActiveCompany(),
+      update: async (data) => {
+        const companyId = await getActiveCompanyId();
+        await db.companies.update(companyId, {
+          name: data.name, gst_number: data.gst_number || null, state: data.state,
+          address: data.address || null, phone: data.phone || null, email: data.email || null,
+          bank_details: data.bank_details || null, theme_color: data.theme_color || '#004ac6',
+          upi_id: data.upi_id || null
+        });
+        return { success: true };
+      }
+    },
+  font-weight: 600;
+  padding: 6px 12px;
+}
+
+.btn-install {
+  font-size: 12px;
+  font-weight: 600;
+  background: #146c3a;
+  color: white;
+  border: none;
+        const newId = await db.customer_categories.add({ company_id: id, name });
+        return { id: newId };
+      },
+      delete: async (id) => {
+        const count = await db.customers.where('category_id').equals(id).count();
+        if (count > 0) return { success: false, reason: `${count} customer${count === 1 ? '' : 's'} use this category and it can't be deleted.` };
+        await db.customer_categories.delete(id);
+        return { success: true };
+      }
+    },
+
+    // ─── Product Categories ─────────────────────────────────────────────────
+
+    productCategories: {
+      list: async () => {
+        const id = await getActiveCompanyId();
+        return db.product_categories.where('company_id').equals(id).sortBy('name');
+      },
+      create: async (name) => {
+        const id = await getActiveCompanyId();
+        cons
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+        const products = await db.products.where('company_id').equals(companyId).sortBy('name');
+        const items = await db.price_list_items.where('price_list_id').equals(priceListId).toArray();
+        const itemMap = {};
+        items.forEach(it => { itemMap[it.product_id] = it.price; });
+        return products.map(p => ({
+          id: p.id, name: p.name, sku: p.sku, base_price: p.base_price,
+          override_price: itemMap[p.id] != null ? itemMap[p.id] : null
+        }));
+      },
+      save: async (priceListId, items) => {
+        for (const it of items) {
+          if (it.price === null || it.price === '' || it.price === undefined) {
+            await db.price_list_items.where('[price_list_id+product_id]').equals([priceListId, it.product_id]).delete();
+          } else {
+            const existing = await db.price_list_items.where('[price_list_id+product_id]').equals([priceListId, it.product_id]).first();
+            if (existing) {
+              await db.price_list_items.update(existing.id, { price: Number(it.price) });
+            } else {
+              await db.price_list_items.add({ price_list_id: priceListId, product_id: it.product_id, price: Number(it.price) });
+            }
+          }
+        }
+        return { success: true };
+      }
+    },
+
+    // ─── Customers ────────────────────────────────────────
+
+    customers: {
+      list: async () => {
+        const companyId = await getActiveCompanyId();
+        const customers = await db.customers.where('company_id').equals(companyId).reverse().sortBy('created_at');
+        const categories = await db.customer_categories.toArray();
+        const priceLists = await db.price_lists.toArray();
+        const catMap = {}, plMap = {};
+        categories.forEach(c => { catMap[c.id] = c.name; });
+        priceLists.forEach(pl => { plMap[pl.id] = pl.name; });
+        return customers.map(c => ({
+          ...c,
+          category_name: catMap[c.category_id] || null,
+          price_list_name: plMap[c.price_list_id] || null
+        }));
+      },
+      create: async (data) => {
+          } else {
+            const existing = await db.price_list_items.where('[price_list_id+product_id]').equals([priceListId, it.product_id]).first();
+            if (existing) {
+              await db.price_list_items.update(existing.id, { price: Number(it.price) });
+            } else {
+              await db.price_list_items.add({ price_list_id: priceListId, product_id: it.product_id, price: Number(it.price) });
+            }
+          }
+        }
+        return { success: true };
+      }
+    },
+
+    // ─── Customers ──────────────────────────────────────────────────────────
+
+    customers: {
+      list: async () => {
+        const companyId = await getActiveCompanyId();
+        const customers = await db.customers.where('company_id').equals(companyId).reverse().sortBy('created_at');
+        const categories = await db.customer_categories.toArray();
+        const priceLists = await db.price_lists.toArray();
+        const catMap = {}, plMap = {};
+        categories.forEach(c => { catMap[c.id] = c.name; });
+        priceLists.forEach(pl => { plMap[pl.id] = pl.name; });
+        return customers.map(c => ({
+          ...c,
+          category_name: catMap[c.category_id] || null,
+          price_list_name: plMap[c.price_list_id] || null
+        }));
+      },
+      create: async (data) => {
+        const companyId = await getActiveCompanyId();
+        const id = await db.customers.add({
+          company_id: companyId, ...normalizeCustomer(data),
+          created_at: new Date().toISOString()
+        });
+        return { id };
+        });
+        return { id };
+      },
+      update: async (id, data) => {
+        await db.products.update(id, normalizeProduct(data));
+        return { success: true };
+      },
+      delete: async (id) => {
+        const itemCount = await db.quotation_items.where('product_id').equals(id).count();
+        if (itemCount > 0) {
+          return { success: false, reason: `This product appears in ${itemCount} quotation line item${itemCount === 1 ? '' : 's'} and can't be deleted.` };
+        }
+        await db.price_list_items.where('product_id').equals(id).delete();
+        await db.products.delete(id);
+        return { success: true };
+      }
+    },
+
+    // ─── Templates & Letterheads ────────────────────────────────────────────
+
+    templates: {
+      list: async () => {
+        const companyId = await getActiveCompanyId();
+        const templates = await db.templates.where('company_id').equals(companyId).sortBy('name');
+        return templates.map(t => ({
+          ...t, blocks: typeof t.blocks_json === 'string' ? JSON.parse(t.blocks_json) : t.blocks_json
+        }));
+      },
+      create: async ({ name, blocks }) => {
+        const companyId = await getActiveCompanyId();
+        const id = await db.templates.add({ company_id: companyId, name, blocks_json: JSON.stringify(blocks) });
+        return { id };
+      },
+      update: async (id, { name, blocks }) => {
+        await db.templates.update(id, { name, blocks_json: JSON.stringify(blocks) });
+        return { success: true };
+      },
+      delete: async (id) => {
+        const count = await db.quotations.where('template_id').equals(id).count();
+        if (count > 0) return { success: false, reason: `${count} quotation${count === 1 ? '' : 's'} use this template and it can't be deleted.` };
+        await db.templates.delete(id);
+        return { success: true };
+      }
+    },
+
+    letterheads: {
+      list: async () => {
+        const companyId = await getActiveCompanyId();
+        return db.letterheads.where('company_id').equals(companyId).sortBy('name');
+      },
+      upload: async () => {
+        // In the PWA, we use a browser file picker instead of Electron dialog
+        return new Promise((resolve) => {
+          const input = document.getElementById('letterhead-file-input');
+          if (!input) return resolve({ success: false, canceled: true });
+          input.onchange = async () => {
+            const file = input.files[0];
+            if (!file) return resolve({ success: false, canceled: true });
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+              const dataUrl = e.target.result;
+              const companyId = await getActiveCompanyId();
+              const name = file.name.replace(/\\.[^.]+$/, '');
+              const id = await db.letterheads.add({ company_id: companyId, name, data_url: dataUrl });
+              resolve({ success: true, id, name, file_path: dataUrl });
+            };
+            reader.readAsDataURL(file);
+            input.value = '';
+          };
+          input.click();
+
+.btn-danger { color: var(--danger); }
+
+.danger-zone {
+  border: 1px solid var(--danger);
+  background: color-mix(in srgb, var(--danger) 4%, var(--card));
+}
+.danger-zone h3 { color: var(--danger); }
+
+        return db.letterheads.where('company_id').equals(companyId).sortBy('name');
+      },
+      upload: async () => {
+        // In the PWA, we use a browser file picker instead of Electron dialog
+        return new Promise((resolve) => {
+          const input = document.getElementById('letterhead-file-input');
+          if (!input) return resolve({ success: false, canceled: true });
+          input.onchange = async () => {
+            const file = input.files[0];
+            if (!file) return resolve({ success: false, canceled: true });
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+              const dataUrl = e.target.result;
+              const companyId = await getActiveCompanyId();
+              const name = file.name.replace(/\\.[^.]+$/, '');
+              const id = await db.letterheads.add({ company_id: companyId, name, data_url: dataUrl });
+              resolve({ success: true, id, name, file_path: dataUrl });
+            };
+            reader.readAsDataURL(file);
+            input.value = '';
+          };
+          input.click();
+        });
+      },
+      delete: async (id) => {
+        const count = await db.quotations.where('letterhead_id').equals(id).count();
+        if (count > 0) return { success: false, reason: `${count} quotation${count === 1 ? '' : 's'} use this letterhead and it can't be deleted.` };
+        await db.letterheads.delete(id);
+}
+      }
+    },
+
+    // ─── Settings ───────────────────────────────────────────────────────────
+
+    settings: {
+      get: async () => {
+        const companyId = await getActiveCompanyId();
+        const prefix = `company_${companyId}_`;
+        const all = await db.settings.toArray();
+        const result = {};
+      },
+      list: async () => {
+        const companyId = await getActiveCompanyId();
+        const quotes = await db.quotations.where('company_id').equals(companyId).reverse().sortBy('created_at');
+        const customers = await db.customers.toArray();
+        const custMap = {};
+        customers.forEach(c => { custMap[c.id] = c; });
+        return quotes.map(q => {
+          const c = custMap[q.customer_id] || {};
+          return { ...q, contact_name: c.contact_name, company_name: c.company_name };
+        });
+      },
+      get: async (id) => getFullQuoteById(id),
+      create: async (payload) => {
+        const company = await getActiveCompany();
+        const customer = await db.customers.get(payload.customer_id);
+        if (!customer) throw new Error('Customer not found');
+        const calc = calculateTotals(payload.items, company.state, customer.state, payload.discount || 0);
+        const user = await db.users.toCollection().first();
+        const quoteNumber = await generateQuoteNumber(company.id, new Date());
+        const now = new Date().toISOString();
+        const id = await db.quotations.add({
+          company_id: company.id, user_id: user ? user.id : null,
+          customer_id: payload.customer_id, template_id: payload.template_id || null,
+          letterhead_id: payload.letterhead_id || null, quote_number: quoteNumber,
+          revision_number: 1, status: payload.status || 'Draft',
+
+        if (universal) return JSON.parse(universal.value);
+        return null;
+      }
+    },
+
+    // ─── Quotations ──────────────────────────────────────────────────────────
+
+    quotations: {
+      productsForCustomer: async (customerId) => {
+        const customer = await db.customers.get(customerId);
+        const priceListId = customer ? customer.price_list_id : null;
+        const companyId = await getActiveCompanyId();
+        const products = await db.products.where('company_id').equals(companyId).sortBy('name');
+        let itemMap = {};
+        if (priceListId) {
+          const items = await db.price_list_items.where('price_list_id').equals(priceListId).toArray();
+          items.forEach(it => { itemMap[it.product_id] = it.price; });
+        }
+        return products.map(p => ({
+          ...p, override_price: itemMap[p.id] != null ? itemMap[p.id] : null,
+          resolved_price: itemMap[p.id] != null ? itemMap[p.id] : p.base_price
+        }));
+      },
+      list: async () => {
+        const companyId = await getActiveCompanyId();
+        const quotes = await db.quotations.where('company_id').equals(companyId).reverse().sortBy('created_at');
+        const customers = await db.customers.toArray();
+        const custMap = {};
+        customers.forEach(c => { custMap[c.id] = c; });
+        return quotes.map(q => {
+          const c = custMap[q.customer_id] || {};
+          return { ...q, contact_name: c.contact_name, company_name: c.company_name };
+        });
+      },
+.form-group { flex: 1; display: flex; flex-direction: 
+        const quote = await db.quotations.get(id);
+        await db.quotations.update(id, { status });
+        await logActivity(id, 'status_change', `Status changed to ${status}`);
+        if (quote) await logDocumentAudit(quote.company_id, 'Quotation', id, quote.quote_number, 'Status Changed', `New status: ${status}`);
+        return { success: true };
+      },
+      convertToInvoice: async (id) => {
+        const quote = await getFullQuoteById(id);
+        if (!quote) throw new Error('Quotation not found');
+        const existing = await db.invoices.where('quotation_id').equals(id).first();
+        if (existing) return { id: existing.id, invoice_number: existing.invoice_number, already_existed: true };
+        const company = await getActiveCompany();
+        const invoiceNumber = await generateInvoiceNumber(company.id, new Date());
+        const now = new Date().toISOString();
+        const invoiceId = await db.invoices.add({
+          company_id: quote.company_id, quotation_id: quote.id, customer_id: quote.customer_id,
+          template_id: quote.template_id || null, letterhead_id: quote.letterhead_id || null,
+          invoice_number: invoiceNumber, status: 'Issued', issue_date: now,
+          due_date: quote.valid_until || null, payment_terms: quote.payment_terms || null,
+          notes: quote.notes || null, subtotal: quote.subtotal, cgst_amount: quote.cgst_amount,
+          sgst_amount: quote.sgst_amount, igst_amount: quote.igst_amount, discount: quote.discount,
+          total: quote.total, amount_paid: 0, payment_status: 'Unpaid', created_at: now
+        });
+        await insertInvoiceItems(invoiceId, quote.items);
+        await logActivity(quote.id, 'status_change', `Converted to invoice ${invoiceNumber}`);
+        await logDocumentAudit(quote.company_id, 'Invoice', invoiceId, invoiceNumber, 'Created', `Converted from Quotation ${quote.quote_number}`);
+        if (quote.status !== 'Approved') await db.quotations.update(quote.id, { status: 'Approved' });
+        return { id: invoiceId, invoice_number: invoiceNumber };
+      },
+      previewPdf: async (id) => {
+        const quote = await getFullQuoteById(id);
+        if (!quote) throw new Error('Quotation not found');
+        const company = await db.companies.get(quote.company_id);
+        const { template, letterheadPath } = await resolveTemplateAndLetterhead(quote);
+        const html = buildQuotationHtml(quote, company, template, letterheadPath);
+        printHtmlAsPdf(html, `Preview — ${quote.quote_number}`);
+        return { success: true };
+      },
+      exportPdf: async (id) => {
+        const quote = await getFullQuoteById(id);
+        if (!quote) throw new Error('Quotation not found');
+        const company = await db.companies.get(quote.company_id);
+        const { template, letterheadPath } = await resolveTemplateAndLetterhead(quote);
+        const html = buildQuotationHtml(quote, company, template, letterheadPath);
+        printHtmlAsPdf(html, `Export — ${quote.quote_number}`);
+        return { success: true };
+      },
+      exportSelectedPdf: async (ids) => {
+        for (const id of ids) {
+          const quote = await getFullQuoteById(id);
+          if (!quote) continue;
+          const company = await db.companies.get(quote.company_id);
+          const { template, letterheadPath } = await resolveTemplateAndLetterhead(quote);
+          const html = buildQuotationHtml(quote, company, template, letterheadPath);
+          printHtmlAsPdf(html, `Export — ${quote.quote_number}`);
+          await new Promise(r => setTimeout(r, 500));
+        }
+        return { success: true, count: ids.length };
+      },
+      exportExcel: async (id) => {
+        const quote = await getFullQuoteById(id);
+        if (!quote) throw new Error('Quotation not found');
+        const company = await db.companies.get(quote.company_id);
+        return exportDocumentExcel(quote, company, 'QUOTATION');
+      },
+      exportWord: async (id) => {
+        // Word export not available in PWA (requires heavy library) — open PDF instead
+        return api.quotations.exportPdf(id);
+      }
+    },
+
+    // ─── Invoices ────────────────────────────────────────────────────────────
+
+    invoices: {
+      list: async () => {
+        const companyId = await getActiveCompanyId();
+        const invoices = await db.invoices.where('company_id').equals(companyId).reverse().sortBy('created_at');
+        const customers = await db.customers.toArray();
+        const custMap = {};
+        customers.forEach(c => { custMap[c.id] = c; });
+        return invoices.map(inv => {
+          const c = custMap[inv.customer_id] || {};
+          return { ...inv, contact_name: c.contact_name, company_name: c.company_name };
+        });
+      },
+      get: async (id) => getFullInvoiceById(id),
+      create: async (payload) => {
+        const company = await getActiveCompany();
+        const customer = await db.customers.get(payload.customer_id);
+        if (!customer) throw new Error('Customer not found');
+        const calc = calculateTotals(payload.items, company.state, customer.state, payload.discount || 0);
+        const invoiceNumber = await generateInvoiceNumber(company.id, new Date());
+        const now = new Date().toISOString();
+        const invoiceId = await db.invoices.add({
+          company_id: company.id, quotation_id: null, customer_id: payload.customer_id,
+          template_id: payload.template_id || null, letterhead_id: payload.letterhead_id || null,
+          invoice_number: invoiceNumber, status: 'Issued', issue_date: payload.issue_date || now,
+          due_date: payload.due_date || null, payment_terms: payload.payment_terms || null,
+          notes: payload.notes || null, subtotal: calc.subtotal, cgst_amount: calc.cgst,
+          sgst_amount: calc.sgst, igst_amount: calc.igst, discount: Number(payload.discount || 0),
+          total: calc.total, amount_paid: 0, payment_status: 'Unpaid',
+          eway_bill_number: payload.eway_bill_number || null, eway_bill_date: payload.eway_bill_date || null,
+          created_at: now
+        });
+        await insertInvoiceItems(invoiceId, payload.items);
+        await logDocumentAudit(company.id, 'Invoice', invoiceId, invoiceNumber, 'Created', 'Direct Tax Invoice');
+        return { id: invoiceId, invoice_number: invoiceNumber };
+      },
+      cancel: async (id) => {
+        const invoice = await db.invoices.get(id);
+        await db.invoices.update(id, { status: 'Cancelled' });
+        if (invoice) await logDocumentAudit(invoice.company_id, 'Invoice', id, invoice.invoice_number, 'Cancelled', null);
+        return { success: true };
+      },
+      delete: async (id) => {
+        await db.invoice_items.where('invoice_id').equals(id).delete();
+        await db.invoice_payments.where('invoice_id').equals(id).delete();
+        await db.invoices.delete(id);
+        return { success: true };
+      },
+      updateEwayBill: async (id, data) => {
+        await db.invoices.update(id, {
+          eway_bill_number: data.eway_bill_number || null,
+          eway_bill_date: data.eway_bill_date || null
+        });
+        return { success: true };
+      },
+      previewPdf: async (id) => {
+        const invoice = await getFullInvoiceById(id);
+        if (!invoice) throw new Error('Invoice not found');
+        const company = await db.companies.get(invoice.company_id);
+        const { template, letterheadPath } = await resolveTemplateAndLetterhead(invoice);
+        const html = buildInvoiceHtml(invoice, company, template, letterheadPath);
+        printHtmlAsPdf(html, `Preview — ${invoice.invoice_number}`);
+        return { success: true };
+      },
+      exportPdf: async (id) => {
+        const invoice = await getFullInvoiceById(id);
+        if (!invoice) throw new Error('Invoice not found');
+}
+.line-items-table .num-input { text-align: right; }
+.remove-line {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 15px;
+  cursor: pointer;
+}
+.remove-line:hover { color: var(--danger); }
+
+.item-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.item-row input, .item-row select {
+  flex: 1;
+  font-size: 12.5px;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  font-family: inherit;
+}
+.item-row .remove-line { flex: 0 0 auto; }
+
+.inline-note {
+  font-size: 12px;
+  color: var(--muted);
+  padding: 8px 0;
+}
+
+.summary-lines { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.summary-line { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+.summary-line.total {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+  margin-top: 4px;
+}
+
+.actions { display: flex; flex-direction: column; gap: 8px; }
+.actions .btn { width: 100%; }
+
+/* Dashboard */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.stat-card { padding: 18px 20px; }
+.stat-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); margin-bottom: 8px; }
+.stat-value { font-size: 24px; font-weight: 700; color: var(--text); }
+.stat-note { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+.pipeline-bar {
+  display: flex;
+  height: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: var(--bg);
+}
+.pipeline-segment { height: 100%; }
+
+.pipeline-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 12px; }
+.legend-item { font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 5px; }
+.legend-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+.dash-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.list-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12.5px;
+}
+.list-row:last-child { border-bottom: none; }
+.list-row-title { font-weight: 600; color: var(--text); }
+.list-row-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+.pipeline-segment.badge-gray, .legend-dot.badge-gr
+.pipeline-segment.badge-blue, .legend-dot.badge-blue   { background: var(--primary); }
+.pipeline-segment.badge-amber, .legend-dot.badge-amber { background: #d98c00; }
+.pipeline-segment.badge-green, .legend-dot.badge-green { background: #1e9e56; }
+.pipeline-segment.badge-red, .legend-dot.badge-red     { background: var(--danger); }
+
+  if (diffHr < 24) return `${diffHr}h ago`;
+  const diffDay = Math.round(diffHr / 24);
+  return `${diffDay}d ago`;
+}
+
+function formatShortDate(isoStr) {
+  if (!isoStr) return '—';
+  const d = new Date(isoStr.includes('T') ? isoStr : isoStr.replace(' ', 'T') + 'Z');
+  if (isNaN(d)) return isoStr;
+  return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+// ─── Invoices ────────────────────────────────────────────────────────────────
+
+const INVOICE_STATUS_CLASSES = { Issued: 'badge-green', Cancelled: 'badge-red' };
+const PAYMENT_STATUS_CLASSES = { Unpaid: 'badge-red', 'Partially Paid': 'badge-amber', Paid: 'badge-green' };
+const PAYMENT_MODES = ['Cash', 'Bank Transfer', 'UPI', 'Cheque', 'Card', 'Other'];
+
+async function renderInvoicesList() {
+  const invoices = await window.api.invoices.list();
+
+  viewRoot.innerHTML = `
+    ${invoices.length === 0
+      ? `<div class=\"empty-state\">No invoices yet. Approve a quotation and convert it to generate one.</div>`
+      : `<table class=\"data-table\">
+          <thead>
+            <tr>
+              <th>Invoice #</th>
+              <th>Customer</th>
+              <th>Status</th>
+              <th>Payment</th>
+              <th>Due Date</th>
+              <th>Total</th>
+    width: 100%;
+    height: 60px;
+    flex-direction: row;
+    align-items: center;
+    border-right: none;
+    border-top: 1px solid var(--border);
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 30;
+    background: var(--card);
+  }
+  .logo, .company-switcher, .sidebar-footer { display: none; }
+  .nav {
+    flex-direction: row;
+    overflow-x: auto;
+    width: 100%;
+    padding: 4px 8px;
+    gap: 2px;
+  }
+  .nav-item {
+    font-size: 11px;
+    padding: 8px 10px;
+    white-space: nowrap;
+    text-align: center;
+  }
+  .content { padding-bottom: 65px; }
+  .topbar { padding: 0 12px; gap: 8px; }
+  .global-search { width: 180px; }
+  .stat-grid { grid-template-columns: 1fr; }
+  .dash-grid { grid-template-columns: 1fr; }
+  .builder { flex-direction: column; }
+  .builder-side { width: 100%; }
+}

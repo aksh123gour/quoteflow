@@ -2141,11 +2141,11 @@ async function renderReports(range) {
         <tbody>
           ${ledger.months.map((m, idx) => `
             <tr>
-              <td><strong>${MONTH_NAMES[m.month - 1]} ${year}</strong></td>
+              <td><strong>${escapeHtml(m.month_name || (MONTH_NAMES[idx] + ' ' + year))}</strong></td>
               <td class="r mono">${m.invoice_count}</td>
               <td class="r mono">${fmt(m.total_invoiced)}</td>
-              <td class="r mono" style="color:#1a7f4b;">${fmt(m.payments_received)}</td>
-              <td class="r mono" style="color:${m.outstanding_balance > 0 ? '#c0392b' : '#1a7f4b'};">${fmt(m.outstanding_balance)}</td>
+              <td class="r mono" style="color:#1a7f4b;">${fmt(m.payments_received ?? m.total_received ?? 0)}</td>
+              <td class="r mono" style="color:${(m.outstanding_balance ?? m.balance_due ?? 0) > 0 ? '#c0392b' : '#1a7f4b'};">${fmt(m.outstanding_balance ?? m.balance_due ?? 0)}</td>
               <td>${m.invoice_count > 0 ? `<button class="btn btn-sm view-month-details" data-idx="${idx}" style="white-space:nowrap;">View Details</button>` : ''}</td>
             </tr>
           `).join('')}
@@ -2155,8 +2155,8 @@ async function renderReports(range) {
             <td>Year Total</td>
             <td class="r mono">${ledger.months.reduce((s,m)=>s+m.invoice_count,0)}</td>
             <td class="r mono">${fmt(ledger.months.reduce((s,m)=>s+m.total_invoiced,0))}</td>
-            <td class="r mono" style="color:#1a7f4b;">${fmt(ledger.months.reduce((s,m)=>s+m.payments_received,0))}</td>
-            <td class="r mono" style="color:#c0392b;">${fmt(ledger.months.reduce((s,m)=>s+m.outstanding_balance,0))}</td>
+            <td class="r mono" style="color:#1a7f4b;">${fmt(ledger.months.reduce((s,m)=>s+(m.payments_received ?? m.total_received ?? 0),0))}</td>
+            <td class="r mono" style="color:#c0392b;">${fmt(ledger.months.reduce((s,m)=>s+(m.outstanding_balance ?? m.balance_due ?? 0),0))}</td>
             <td></td>
           </tr>
         </tfoot>

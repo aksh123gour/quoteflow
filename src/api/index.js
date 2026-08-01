@@ -1206,13 +1206,16 @@ export function buildWindowApi() {
           const balanceDue = round2(totalInvoiced - totalReceived);
 
           return {
+            month: idx + 1,
             month_key: monthKey,
             month_name: `${name} ${selectedYear}`,
             month_short: name,
             invoice_count: monthInvoices.length,
             total_invoiced: totalInvoiced,
             total_received: totalReceived,
+            payments_received: totalReceived,
             balance_due: balanceDue,
+            outstanding_balance: balanceDue,
             invoices: monthInvoices
           };
         });

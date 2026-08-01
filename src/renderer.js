@@ -458,7 +458,7 @@ async function renderProducts() {
                 <td style="padding:6px;">
                   ${p.image
                     ? `<img src="${p.image}" alt="" style="width:44px;height:44px;object-fit:contain;border-radius:4px;border:1px solid #e5e7eb;background:#f9fafb;display:block;">`
-                    : `<div style="width:44px;height:44px;border-radius:4px;border:1px dashed #d1d5db;background:#f9fafb;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:18px;">&#128247;</div>`
+                    : `<div style="width:44px;height:44px;border-radius:4px;border:1px dashed #d1d5db;background:#f9fafb;display:flex;align-items:center;justify-content:center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></div>`
                   }
                 </td>
                 <td><strong>${escapeHtml(p.name)}</strong>${p.description ? `<div style="font-size:11px;color:#6b7280;margin-top:2px;">${escapeHtml(p.description.slice(0,60))}${p.description.length>60?'…':''}</div>` : ''}</td>
@@ -561,7 +561,7 @@ async function openProductForm(product) {
           <div id="prod-img-preview" style="width:80px;height:80px;border-radius:8px;border:1px solid #e5e7eb;background:#f9fafb;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">
             ${product?.image
               ? `<img src="${product.image}" style="width:100%;height:100%;object-fit:contain;"/>`
-              : `<span style="font-size:28px;color:#d1d5db;">&#128247;</span>`
+              : `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`
             }
           </div>
           <div style="display:flex;flex-direction:column;gap:8px;">
@@ -606,7 +606,7 @@ async function openProductForm(product) {
     removeBtn.onclick = () => {
       _productImageDataUrl = null;
       const preview = document.getElementById('prod-img-preview');
-      preview.innerHTML = `<span style="font-size:28px;color:#d1d5db;">&#128247;</span>`;
+      preview.innerHTML = `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`;
       removeBtn.style.display = 'none';
       document.getElementById('prod-img-input').value = '';
     };
@@ -3799,63 +3799,16 @@ function setLoading(btn, isLoading) {
   }
 }
 
+// shareViaWhatsApp: opens the PDF preview overlay with the WhatsApp share button pre-wired.
+// The share logic lives in pdf.js > shareFromPreview. getPdfFile now delegates to exportPdf.
 async function shareViaWhatsApp(docType, id) {
-  const api = API_MAP[docType]?.();
-  if (!api) return;
-
+  const apiObj = API_MAP[docType]?.();
+  if (!apiObj) return;
   try {
-    // 1. Generate the actual PDF File object
-    const res = await api.getPdfFile(id);
-    if (!res || !res.file) {
-      throw new Error('Failed to generate PDF file.');
-    }
-
-    const { file, fileName, docNumber } = res;
-    const shareTitle = docNumber || 'QuoteFlow Document';
-    const messageText = `Please find ${docNumber ? `document ${docNumber}` : 'the attached document'} from QuoteFlow.`;
-
-    // 2. Check if device & browser support sharing files via Web Share API
-    const canShareFiles = typeof navigator.share === 'function' &&
-                          typeof navigator.canShare === 'function' &&
-                          navigator.canShare({ files: [file] });
-
-    if (canShareFiles) {
-      try {
-        await navigator.share({
-          title: shareTitle,
-          text: messageText,
-          files: [file]
-        });
-        return;
-      } catch (err) {
-        if (err.name === 'AbortError') return; // User closed system share sheet
-        console.warn('Native file share failed, falling back to download:', err);
-      }
-    }
-
-    // 3. Fallback for desktop / unsupported browsers:
-    // Download the PDF file to user's device and open WhatsApp with an explanatory message
-    const blobUrl = URL.createObjectURL(file);
-    const downloadLink = document.createElement('a');
-    downloadLink.href = blobUrl;
-    downloadLink.download = fileName;
-    document.body.appendChild(downloadLink);
-    downloadLink.click();
-    document.body.removeChild(downloadLink);
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
-
-    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    const promptMessage = encodeURIComponent(`${messageText}\n\n(The PDF file "${fileName}" has been downloaded to your device. Please attach it to this chat.)`);
-    const waUrl = isMobile
-      ? `https://api.whatsapp.com/send?text=${promptMessage}`
-      : `https://web.whatsapp.com/send?text=${promptMessage}`;
-
-    window.open(waUrl, '_blank');
+    await apiObj.getPdfFile(id);
   } catch (err) {
     console.error('WhatsApp share error:', err);
-    if (typeof openInfo === 'function') {
-      openInfo('Could not generate PDF for sharing: ' + (err.message || err));
-    }
+    if (typeof openInfo === 'function') openInfo('Could not open document: ' + (err.message || err));
   }
 }
 

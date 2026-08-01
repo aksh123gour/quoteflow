@@ -1,5 +1,5 @@
 import QRCode from 'qrcode-svg';
-import html2pdf from 'html2pdf.js';
+// Note: html2pdf is imported only if needed elsewhere; share path now uses native preview+print
 
 export const DEFAULT_BLOCKS = [
   { type: 'header', enabled: true, showCompanyName: true, showCompanyContact: true },
@@ -459,8 +459,9 @@ export function buildCreditDebitNoteHtml(note, company, letterheadPath, layoutOp
   return wrapDoc(body, layoutOptions);
 }
 
-// Opens a print dialog for saving as PDF — the main PDF export mechanism in browsers
-export function printHtmlAsPdf(html, title) {
+// Opens a print dialog for saving as PDF — the main PDF export mechanism in browsers.
+// Optional shareContext: { docTitle, docNumber, htmlBlob } — wires up the WhatsApp share button.
+export function printHtmlAsPdf(html, title, shareContext = null) {
   const iframe = document.getElementById('pdf-preview-iframe');
   const overlay = document.getElementById('pdf-preview-overlay');
   const titleEl = document.getElementById('pdf-preview-title');
@@ -472,53 +473,105 @@ export function printHtmlAsPdf(html, title) {
   iframe.src = url;
   overlay.classList.remove('hidden');
 
+  // Store current html blob for share use
+  overlay._currentHtml = html;
+  overlay._currentTitle = shareContext?.docTitle || title || 'Document';
+  overlay._currentDocNumber = shareContext?.docNumber || '';
+
   document.getElementById('pdf-print-btn').onclick = () => {
     iframe.contentWindow.focus();
     iframe.contentWindow.print();
   };
+
+  // Wire up the WhatsApp share button if it exists
+  const waBtn = document.getElementById('pdf-wa-share-btn');
+  if (waBtn) {
+    waBtn.style.display = '';
+    waBtn.onclick = () => shareFromPreview(overlay._currentHtml, overlay._currentDocNumber, overlay._currentTitle);
+  }
+
   document.getElementById('pdf-preview-close').onclick = () => {
     overlay.classList.add('hidden');
     URL.revokeObjectURL(url);
+    if (waBtn) waBtn.style.display = 'none';
   };
 }
 
+// Share the document HTML from the preview overlay via WhatsApp
+// On mobile: uses Web Share API to share the .html file (renders in any browser)
+// On desktop: downloads the .html and opens WhatsApp Web with a message
+async function shareFromPreview(html, docNumber, docTitle) {
+  const safeName = `${docTitle || 'Document'}${docNumber ? '_' + docNumber : ''}`
+    .replace(/[/\\?%*:|"<>\s]/g, '_');
+  const fileName = `${safeName}.html`;
+  const messageText = `Please find ${docNumber ? 'document ' + docNumber : 'the attached document'} from QuoteFlow.`;
+
+  const htmlBlob = new Blob([html], { type: 'text/html' });
+  const htmlFile = new File([htmlBlob], fileName, { type: 'text/html' });
+
+  // Try native Web Share API with file (works on Android Chrome / Samsung Internet)
+  if (typeof navigator.share === 'function' &&
+      typeof navigator.canShare === 'function' &&
+      navigator.canShare({ files: [htmlFile] })) {
+    try {
+      await navigator.share({ title: docTitle, text: messageText, files: [htmlFile] });
+      return;
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+      console.warn('File share not supported, falling back:', err);
+    }
+  }
+
+  // Fallback: download the HTML file + open WhatsApp
+  const blobUrl = URL.createObjectURL(htmlBlob);
+  const a = document.createElement('a');
+  a.href = blobUrl;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const waMsg = encodeURIComponent(`${messageText}\n\n("${fileName}" downloaded — open it in your browser, then print to PDF and attach here.)`);
+  window.open(
+    isMobile ? `https://api.whatsapp.com/send?text=${waMsg}` : `https://web.whatsapp.com/send?text=${waMsg}`,
+    '_blank'
+  );
+}
+
 export async function generatePdfBlob(html, fileName = 'document.pdf') {
-  const iframe = document.createElement('iframe');
-  iframe.style.position = 'fixed';
-  iframe.style.left = '0';
-  iframe.style.top = '0';
-  iframe.style.width = '794px';
-  iframe.style.height = '1123px';
-  iframe.style.zIndex = '-99999';
-  iframe.style.opacity = '0';
-  iframe.style.border = 'none';
-  iframe.style.pointerEvents = 'none';
-  document.body.appendChild(iframe);
+  // Legacy function retained for compatibility. For sharing, use printHtmlAsPdf + shareFromPreview.
+  const { default: html2pdf } = await import('html2pdf.js');
+  const parser = new DOMParser();
+  const parsed = parser.parseFromString(html, 'text/html');
+  const styleContent = Array.from(parsed.querySelectorAll('style')).map(s => s.textContent).join('\n');
+  const bodyContent = parsed.body.innerHTML;
+
+  const styleEl = document.createElement('style');
+  styleEl.id = '__pdf-export-styles';
+  styleEl.textContent = styleContent.replace(/@page[^}]*}/g, '');
+  document.head.appendChild(styleEl);
+
+  const container = document.createElement('div');
+  container.id = '__pdf-export-container';
+  container.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;background:#fff;z-index:-1;font-family:Arial,sans-serif;';
+  container.innerHTML = bodyContent;
+  document.body.appendChild(container);
 
   try {
-    const doc = iframe.contentWindow.document;
-    doc.open();
-    doc.write(html);
-    doc.close();
-
-    // Wait for fonts & images to render
-    await new Promise((r) => setTimeout(r, 400));
-
+    await new Promise(r => setTimeout(r, 600));
     const opt = {
-      margin:       [8, 8, 8, 8],
-      filename:     fileName,
-      image:        { type: 'jpeg', quality: 0.98 },
-      html2canvas:  { scale: 2, useCORS: true, logging: false, windowWidth: 794 },
-      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      margin: [8, 8, 8, 8],
+      filename: fileName,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, logging: false, windowWidth: 794 },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
-
-    const target = doc.body || doc.documentElement;
-    const blob = await html2pdf().set(opt).from(target).outputPdf('blob');
-    return blob;
+    return await html2pdf().set(opt).from(container).outputPdf('blob');
   } finally {
-    if (iframe.parentNode) {
-      iframe.parentNode.removeChild(iframe);
-    }
+    document.getElementById('__pdf-export-styles')?.remove();
+    document.getElementById('__pdf-export-container')?.remove();
   }
 }
 

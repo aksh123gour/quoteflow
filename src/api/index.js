@@ -17,7 +17,7 @@ import {
   buildQuotationHtml, buildInvoiceHtml, buildChallanHtml,
   buildCreditDebitNoteHtml, DEFAULT_BLOCKS, printHtmlAsPdf
 } from '../docs/pdf.js';
-import { exportDocumentExcel, exportSalesRegister } from '../docs/excel.js';
+import { exportDocumentExcel, exportSalesRegister, exportMonthlyLedgerExcel } from '../docs/excel.js';
 
 // ─── Helper: full document fetchers ──────────────────────────────────────────
 
@@ -254,12 +254,20 @@ export function buildWindowApi() {
       get: async () => getActiveCompany(),
       update: async (data) => {
         const companyId = await getActiveCompanyId();
-        await db.companies.update(companyId, {
+        const update = {
           name: data.name, gst_number: data.gst_number || null, state: data.state,
           address: data.address || null, phone: data.phone || null, email: data.email || null,
           bank_details: data.bank_details || null, theme_color: data.theme_color || '#004ac6',
           upi_id: data.upi_id || null
-        });
+        };
+        // Only update QR image if caller explicitly included the key
+        if ('upi_qr_image' in data) update.upi_qr_image = data.upi_qr_image;
+        await db.companies.update(companyId, update);
+        return { success: true };
+      },
+      updateQr: async (imageDataUrl) => {
+        const companyId = await getActiveCompanyId();
+        await db.companies.update(companyId, { upi_qr_image: imageDataUrl || null });
         return { success: true };
       }
     },
@@ -712,6 +720,7 @@ export function buildWindowApi() {
           notes: payload.notes || null, subtotal: calc.subtotal, cgst_amount: calc.cgst,
           sgst_amount: calc.sgst, igst_amount: calc.igst, discount: Number(payload.discount || 0),
           total: calc.total, amount_paid: 0, payment_status: 'Unpaid',
+          bilty_number: payload.bilty_number || null,
           eway_bill_number: payload.eway_bill_number || null, eway_bill_date: payload.eway_bill_date || null,
           vehicle_number: payload.vehicle_number || null, transporter_name: payload.transporter_name || null, distance_km: payload.distance_km || null,
           created_at: now
@@ -734,6 +743,7 @@ export function buildWindowApi() {
       },
       updateEwayBill: async (id, data) => {
         await db.invoices.update(id, {
+          bilty_number: data.bilty_number || null,
           eway_bill_number: data.eway_bill_number || null,
           eway_bill_date: data.eway_bill_date || null,
           vehicle_number: data.vehicle_number || null,
@@ -844,6 +854,7 @@ export function buildWindowApi() {
           challan_number: challanNumber, status: 'Issued',
           issue_date: payload.issue_date || now,
           transport_mode: payload.transport_mode || null, vehicle_number: payload.vehicle_number || null,
+          bilty_number: payload.bilty_number || null,
           eway_bill_number: payload.eway_bill_number || null, eway_bill_date: payload.eway_bill_date || null,
           notes: payload.notes || null, created_at: now
         });
@@ -856,6 +867,16 @@ export function buildWindowApi() {
         }
         await logDocumentAudit(company.id, 'Challan', challanId, challanNumber, 'Created', payload.invoice_id ? `Linked to invoice ID ${payload.invoice_id}` : 'Standalone');
         return { success: true, id: challanId, challan_number: challanNumber };
+      },
+      updateEwayBill: async (id, data) => {
+        await db.delivery_challans.update(id, {
+          bilty_number: data.bilty_number || null,
+          eway_bill_number: data.eway_bill_number || null,
+          eway_bill_date: data.eway_bill_date || null,
+          transport_mode: data.transport_mode || null,
+          vehicle_number: data.vehicle_number || null
+        });
+        return { success: true };
       },
       cancel: async (id) => {
         const challan = await db.delivery_challans.get(id);
@@ -887,7 +908,8 @@ export function buildWindowApi() {
       updateEwayBill: async (id, data) => {
         await db.delivery_challans.update(id, {
           eway_bill_number: data.eway_bill_number || null,
-          eway_bill_date: data.eway_bill_date || null
+          eway_bill_date: data.eway_bill_date || null,
+          bilty_number: 'bilty_number' in data ? (data.bilty_number || null) : undefined
         });
         return { success: true };
       }
@@ -1143,6 +1165,133 @@ export function buildWindowApi() {
           })
           .sort((a, b) => (a.issue_date || '') < (b.issue_date || '') ? -1 : 1);
         return exportSalesRegister(filtered, company, range?.label || 'All Time');
+      },
+      monthlyLedger: async (year) => {
+        const companyId = await getActiveCompanyId();
+        const company = await getActiveCompany();
+        const selectedYear = Number(year) || new Date().getFullYear();
+        
+        const allInvoices = await db.invoices.where('company_id').equals(companyId).toArray();
+        const customers = await db.customers.toArray();
+        const custMap = {};
+        customers.forEach(c => { custMap[c.id] = c; });
+
+        const yearInvoices = allInvoices.filter(inv => {
+          if (!inv.issue_date) return false;
+          const y = new Date(inv.issue_date).getFullYear();
+          return y === selectedYear;
+        });
+
+        const monthNames = [
+          'January', 'February', 'March', 'April', 'May', 'June',
+          'July', 'August', 'September', 'October', 'November', 'December'
+        ];
+
+        const monthsData = monthNames.map((name, idx) => {
+          const monthNum = String(idx + 1).padStart(2, '0');
+          const monthKey = `${selectedYear}-${monthNum}`;
+          
+          const monthInvoices = yearInvoices.filter(inv => (inv.issue_date || '').slice(0, 7) === monthKey).map(inv => {
+            const c = custMap[inv.customer_id] || {};
+            return {
+              ...inv,
+              contact_name: c.contact_name,
+              company_name: c.company_name,
+              customer_gst: c.gst_number
+            };
+          });
+
+          const totalInvoiced = round2(monthInvoices.reduce((s, inv) => s + Number(inv.total || 0), 0));
+          const totalReceived = round2(monthInvoices.reduce((s, inv) => s + Number(inv.amount_paid || 0), 0));
+          const balanceDue = round2(totalInvoiced - totalReceived);
+
+          return {
+            month_key: monthKey,
+            month_name: `${name} ${selectedYear}`,
+            month_short: name,
+            invoice_count: monthInvoices.length,
+            total_invoiced: totalInvoiced,
+            total_received: totalReceived,
+            balance_due: balanceDue,
+            invoices: monthInvoices
+          };
+        });
+
+        const grand_invoice_count = monthsData.reduce((s, m) => s + m.invoice_count, 0);
+        const grand_total_invoiced = round2(monthsData.reduce((s, m) => s + m.total_invoiced, 0));
+        const grand_total_received = round2(monthsData.reduce((s, m) => s + m.total_received, 0));
+        const grand_balance_due = round2(grand_total_invoiced - grand_total_received);
+
+        return {
+          year: selectedYear,
+          months: monthsData,
+          grand_invoice_count,
+          grand_total_invoiced,
+          grand_total_received,
+          grand_balance_due,
+          company
+        };
+      },
+      exportMonthlyLedgerExcel: async (year) => {
+        const companyId = await getActiveCompanyId();
+        const company = await getActiveCompany();
+        const data = await api.reports.monthlyLedger(year);
+        return exportMonthlyLedgerExcel(data, company, year);
+      },
+      printMonthlyLedgerPdf: async (year) => {
+        const data = await api.reports.monthlyLedger(year);
+        const company = data.company || {};
+        const html = `
+          <!DOCTYPE html><html><head><meta charset="UTF-8">
+          <title>Monthly Ledger Summary — ${data.year}</title>
+          <style>
+            body { font-family: 'Segoe UI', Arial, sans-serif; padding: 24px; color: #191c1d; }
+            h1 { font-size: 20px; color: #004ac6; margin-bottom: 4px; }
+            .subtitle { font-size: 13px; color: #666; margin-bottom: 20px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 12px; }
+            th { background: #f1f5f9; padding: 8px 10px; text-align: left; border-bottom: 2px solid #cbd5e1; text-transform: uppercase; font-size: 10px; color: #475569; }
+            td { padding: 9px 10px; border-bottom: 1px solid #e2e8f0; }
+            td.r, th.r { text-align: right; }
+            .grand-row td { font-weight: 700; background: #f8fafc; border-top: 2px solid #191c1d; font-size: 13px; }
+            .due { color: #ba1a1a; font-weight: 600; }
+            .paid { color: #146c3a; font-weight: 600; }
+          </style>
+          </head><body>
+            <h1>${company.name || 'QuoteFlow'} — Monthly Sales &amp; Collections Ledger</h1>
+            <div class="subtitle">Financial Year / Period: <strong>${data.year}</strong> &middot; Generated on ${new Date().toLocaleDateString('en-IN')}</div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Month</th>
+                  <th class="r">Invoices Issued</th>
+                  <th class="r">Total Invoiced (₹)</th>
+                  <th class="r">Payments Received (₹)</th>
+                  <th class="r">Outstanding Balance (₹)</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${data.months.map(m => `
+                  <tr>
+                    <td><strong>${m.month_name}</strong></td>
+                    <td class="r">${m.invoice_count}</td>
+                    <td class="r">₹${m.total_invoiced.toFixed(2)}</td>
+                    <td class="r paid">₹${m.total_received.toFixed(2)}</td>
+                    <td class="r ${m.balance_due > 0 ? 'due' : ''}">₹${m.balance_due.toFixed(2)}</td>
+                  </tr>
+                `).join('')}
+                <tr class="grand-row">
+                  <td>TOTAL (${data.year})</td>
+                  <td class="r">${data.grand_invoice_count}</td>
+                  <td class="r">₹${data.grand_total_invoiced.toFixed(2)}</td>
+                  <td class="r paid">₹${data.grand_total_received.toFixed(2)}</td>
+                  <td class="r ${data.grand_balance_due > 0 ? 'due' : ''}">₹${data.grand_balance_due.toFixed(2)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </body></html>
+        `;
+        printHtmlAsPdf(html, `Monthly Ledger — ${year}`);
+        return { success: true };
       }
     },
 
@@ -1181,9 +1330,10 @@ export function buildWindowApi() {
           (p.hsn_code || '').toLowerCase().includes(q)
         ).slice(0, 5);
 
-        const allQuotes = await db.quotations.where('company_id').equals(companyId).toArray();
         const custMap = {};
         allCustomers.forEach(c => { custMap[c.id] = c; });
+
+        const allQuotes = await db.quotations.where('company_id').equals(companyId).toArray();
         const quotations = allQuotes.filter(qr => {
           const c = custMap[qr.customer_id] || {};
           return (qr.quote_number || '').toLowerCase().includes(q) ||
@@ -1195,7 +1345,33 @@ export function buildWindowApi() {
           return { ...qr, contact_name: c.contact_name, company_name: c.company_name };
         });
 
-        return { customers, products, quotations };
+        const allInvoices = await db.invoices.where('company_id').equals(companyId).toArray();
+        const invoices = allInvoices.filter(inv => {
+          const c = custMap[inv.customer_id] || {};
+          return (inv.invoice_number || '').toLowerCase().includes(q) ||
+            (inv.bilty_number || '').toLowerCase().includes(q) ||
+            (inv.eway_bill_number || '').toLowerCase().includes(q) ||
+            (c.contact_name || '').toLowerCase().includes(q) ||
+            (c.company_name || '').toLowerCase().includes(q);
+        }).slice(0, 5).map(inv => {
+          const c = custMap[inv.customer_id] || {};
+          return { ...inv, contact_name: c.contact_name, company_name: c.company_name };
+        });
+
+        const allChallans = await db.delivery_challans.where('company_id').equals(companyId).toArray();
+        const challans = allChallans.filter(ch => {
+          const c = custMap[ch.customer_id] || {};
+          return (ch.challan_number || '').toLowerCase().includes(q) ||
+            (ch.bilty_number || '').toLowerCase().includes(q) ||
+            (ch.eway_bill_number || '').toLowerCase().includes(q) ||
+            (c.contact_name || '').toLowerCase().includes(q) ||
+            (c.company_name || '').toLowerCase().includes(q);
+        }).slice(0, 5).map(ch => {
+          const c = custMap[ch.customer_id] || {};
+          return { ...ch, contact_name: c.contact_name, company_name: c.company_name };
+        });
+
+        return { customers, products, quotations, invoices, challans };
       }
     },
 

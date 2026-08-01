@@ -1,6 +1,4 @@
-// PDF document template builders — ported from pdf/template.js (original Electron app)
-// These build complete HTML strings for each document type.
-// In PWA mode, letterheadPath is a Base64 data URL stored in IndexedDB.
+import QRCode from 'qrcode-svg';
 
 export const DEFAULT_BLOCKS = [
   { type: 'header', enabled: true, showCompanyName: true, showCompanyContact: true },
@@ -26,6 +24,18 @@ function formatDate(isoStr) {
   const d = new Date(isoStr);
   if (isNaN(d)) return isoStr;
   return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function getUpiQrSvg(upiId, companyName, amount) {
+  if (!upiId) return '';
+  try {
+    const upiUrl = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(companyName || 'QuoteFlow')}&am=${encodeURIComponent(amount || 0)}&cu=INR`;
+    const qr = new QRCode({ text: upiUrl, svgSize: 110, padding: 1 });
+    const svgStr = qr.svg();
+    return 'data:image/svg+xml;utf8,' + encodeURIComponent(svgStr);
+  } catch (e) {
+    return '';
+  }
 }
 
 function round2(n) { return Math.round(n * 100) / 100; }
@@ -213,12 +223,13 @@ export function buildInvoiceHtml(invoice, company, template, letterheadPath, upi
         </div>
       </div>`,
     customer: () => `
-      ${invoice.eway_bill_number ? `
+      ${(invoice.eway_bill_number || invoice.bilty_number) ? `
       <div class="eway-block">
-        <div class="eway-block-title">📦 E-Way Bill Details</div>
+        <div class="eway-block-title">📦 Transport &amp; Dispatch Details</div>
         <div class="eway-grid">
-          <div class="eway-field"><label>E-Way Bill No.</label><span>${esc(invoice.eway_bill_number)}</span></div>
-          <div class="eway-field"><label>Date</label><span>${formatDate(invoice.eway_bill_date)}</span></div>
+          ${invoice.bilty_number ? `<div class="eway-field"><label>Bilty / LR No.</label><span>${esc(invoice.bilty_number)}</span></div>` : ''}
+          ${invoice.eway_bill_number ? `<div class="eway-field"><label>E-Way Bill No.</label><span>${esc(invoice.eway_bill_number)}</span></div>` : ''}
+          ${invoice.eway_bill_date ? `<div class="eway-field"><label>Date</label><span>${formatDate(invoice.eway_bill_date)}</span></div>` : ''}
           ${invoice.vehicle_number ? `<div class="eway-field"><label>Vehicle No.</label><span>${esc(invoice.vehicle_number)}</span></div>` : ''}
           ${invoice.transporter_name ? `<div class="eway-field"><label>Transporter</label><span>${esc(invoice.transporter_name)}</span></div>` : ''}
           ${invoice.distance_km ? `<div class="eway-field"><label>Distance</label><span>${esc(invoice.distance_km)} km</span></div>` : ''}
@@ -287,14 +298,15 @@ export function buildInvoiceHtml(invoice, company, template, letterheadPath, upi
     notes: () => invoice.notes ? `<div class="terms"><div class="terms-label">Notes &amp; Terms</div><div class="terms-body">${esc(invoice.notes)}</div></div>` : '',
     bank: () => {
       const bankSection = company.bank_details ? `<div class="terms"><div class="terms-label">Bank Details</div><div class="terms-body">${esc(company.bank_details)}</div></div>` : '';
-      // UPI QR code on invoice — new PWA feature
-      const upiSection = upiQrDataUrl ? `
+      
+      const qrImgSrc = company.upi_qr_image || upiQrDataUrl || (company.upi_id ? getUpiQrSvg(company.upi_id, company.name, invoice.total) : '');
+      const upiSection = qrImgSrc ? `
         <div class="upi-qr-section">
-          <img src="${upiQrDataUrl}" alt="UPI QR Code">
+          <img src="${qrImgSrc}" alt="Payment QR Code">
           <div class="upi-qr-info">
-            <strong>Pay via UPI</strong>
-            Scan this QR code to pay ₹${Number(invoice.total).toFixed(2)}<br>
-            ${company.upi_id ? 'UPI ID: ' + esc(company.upi_id) : ''}
+            <strong>Scan to Pay via UPI</strong><br>
+            Amount: ₹${Number(invoice.total).toFixed(2)}<br>
+            ${company.upi_id ? 'UPI ID: <strong>' + esc(company.upi_id) + '</strong>' : ''}
           </div>
         </div>` : '';
       return bankSection + upiSection;
@@ -342,10 +354,11 @@ export function buildChallanHtml(challan, company, letterheadPath, layoutOptions
           ${challan.customer_phone ? 'Phone: ' + esc(challan.customer_phone) : ''}
         </div>
       </div>
-      ${(challan.transport_mode || challan.vehicle_number || ewayRequired) ? `
+      ${(challan.transport_mode || challan.vehicle_number || challan.bilty_number || ewayRequired) ? `
       <div class="party">
-        <div class="party-label">Transport</div>
+        <div class="party-label">Transport &amp; Dispatch</div>
         <div class="party-meta">
+          ${challan.bilty_number ? 'Bilty / LR No: ' + esc(challan.bilty_number) + '<br>' : ''}
           ${challan.transport_mode ? 'Mode: ' + esc(challan.transport_mode) + '<br>' : ''}
           ${challan.vehicle_number ? 'Vehicle No: ' + esc(challan.vehicle_number) + '<br>' : ''}
           ${challan.eway_bill_number

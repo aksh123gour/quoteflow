@@ -1026,6 +1026,10 @@ function openInvoiceEwayBillModal(invoiceId) {
         <label>Transporter Name</label>
         <input id="inv-transporter" placeholder="e.g. V-Trans Express">
       </div>
+      <div class="form-group" style="margin-top:4px;">
+        <label>Bilty / LR / Consignment No. <span style="font-weight:400;color:#888;">(optional)</span></label>
+        <input id="inv-bilty-num" placeholder="e.g. LR-98765">
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn modal-cancel">Cancel</button>
@@ -1040,6 +1044,7 @@ function openInvoiceEwayBillModal(invoiceId) {
       document.getElementById('inv-vehicle-num').value = inv.vehicle_number || '';
       document.getElementById('inv-distance').value = inv.distance_km || '';
       document.getElementById('inv-transporter').value = inv.transporter_name || '';
+      document.getElementById('inv-bilty-num').value = inv.bilty_number || '';
     }
   });
 
@@ -1049,7 +1054,8 @@ function openInvoiceEwayBillModal(invoiceId) {
       eway_bill_date: document.getElementById('inv-eway-date').value || null,
       vehicle_number: document.getElementById('inv-vehicle-num').value.trim() || null,
       transporter_name: document.getElementById('inv-transporter').value.trim() || null,
-      distance_km: document.getElementById('inv-distance').value || null
+      distance_km: document.getElementById('inv-distance').value || null,
+      bilty_number: document.getElementById('inv-bilty-num').value.trim() || null
     });
     closeModal();
     renderInvoicesList();
@@ -1104,6 +1110,12 @@ async function openDirectInvoiceModal() {
         <div class="form-group">
           <label>Notes</label>
           <input id="di-notes" placeholder="e.g. Thank you for your business">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Bilty / LR / Consignment No. <span style="font-weight:400;color:#888;">(optional)</span></label>
+          <input id="di-bilty-number" placeholder="e.g. LR-98765 / Bilty-001">
         </div>
       </div>
       <div class="form-group">
@@ -1175,6 +1187,7 @@ async function openDirectInvoiceModal() {
       notes: document.getElementById('di-notes').value.trim() || null,
       discount: Number(document.getElementById('di-discount').value) || 0,
       items: directInvoiceItems,
+      bilty_number: document.getElementById('di-bilty-number') ? document.getElementById('di-bilty-number').value.trim() || null : null,
       eway_bill_number: ewayNum ? ewayNum.value.trim() || null : null,
       eway_bill_date: document.getElementById('di-eway-date') ? document.getElementById('di-eway-date').value || null : null,
       vehicle_number: document.getElementById('di-vehicle-num') ? document.getElementById('di-vehicle-num').value.trim() || null : null,
@@ -1529,35 +1542,44 @@ async function renderChallansList() {
 }
 
 function openEwayBillModal(challanId, currentNumber, currentDate) {
-  openModal(`
-    <div class="modal-header">
-      <h2>E-Way Bill</h2>
-      <button class="modal-close">&times;</button>
-    </div>
-    <div class="modal-body">
-      <div class="form-group">
-        <label>E-Way Bill Number</label>
-        <input id="eway-modal-number" value="${escapeAttr(currentNumber)}" placeholder="e.g. EWB1234567890">
+  window.api.challans.get(challanId).then(ch => {
+    openModal(`
+      <div class="modal-header">
+        <h2>E-Way Bill &amp; Transport Details</h2>
+        <button class="modal-close">&times;</button>
       </div>
-      <div class="form-group">
-        <label>E-Way Bill Date</label>
-        <input id="eway-modal-date" type="date" value="${escapeAttr(currentDate)}">
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>E-Way Bill Number</label>
+            <input id="eway-modal-number" value="${escapeAttr(currentNumber)}" placeholder="e.g. EWB1234567890">
+          </div>
+          <div class="form-group">
+            <label>E-Way Bill Date</label>
+            <input id="eway-modal-date" type="date" value="${escapeAttr(currentDate)}">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Bilty / LR / Consignment No. <span style="font-weight:400;color:#888;">(optional)</span></label>
+          <input id="eway-modal-bilty" value="${escapeAttr(ch ? ch.bilty_number || '' : '')}" placeholder="e.g. LR-98765">
+        </div>
       </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn modal-cancel">Cancel</button>
-      <button class="btn btn-primary" id="save-eway-btn">Save</button>
-    </div>
-  `);
+      <div class="modal-footer">
+        <button class="btn modal-cancel">Cancel</button>
+        <button class="btn btn-primary" id="save-eway-btn">Save</button>
+      </div>
+    `);
 
-  document.getElementById('save-eway-btn').onclick = async () => {
-    await window.api.challans.updateEwayBill(challanId, {
-      eway_bill_number: document.getElementById('eway-modal-number').value.trim(),
-      eway_bill_date: document.getElementById('eway-modal-date').value || null
-    });
-    closeModal();
-    renderChallansList();
-  };
+    document.getElementById('save-eway-btn').onclick = async () => {
+      await window.api.challans.updateEwayBill(challanId, {
+        eway_bill_number: document.getElementById('eway-modal-number').value.trim(),
+        eway_bill_date: document.getElementById('eway-modal-date').value || null,
+        bilty_number: document.getElementById('eway-modal-bilty').value.trim() || null
+      });
+      closeModal();
+      renderChallansList();
+    };
+  });
 }
 
 let challanFormItems = [];
@@ -1597,6 +1619,12 @@ async function openChallanForm() {
         <div class="form-group">
           <label>Vehicle Number</label>
           <input id="ch-vehicle" placeholder="e.g. MP09AB1234">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Bilty / LR / Consignment No. <span style="font-weight:400;color:#888;">(optional)</span></label>
+          <input id="ch-bilty-number" placeholder="e.g. LR-98765 / Bilty-001">
         </div>
       </div>
       <div class="form-group">
@@ -1671,6 +1699,7 @@ async function openChallanForm() {
       invoice_id: Number(document.getElementById('ch-invoice').value) || null,
       transport_mode: document.getElementById('ch-transport-mode').value.trim(),
       vehicle_number: document.getElementById('ch-vehicle').value.trim(),
+      bilty_number: document.getElementById('ch-bilty-number') ? document.getElementById('ch-bilty-number').value.trim() || null : null,
       eway_bill_number: document.getElementById('ch-eway-number').value.trim(),
       eway_bill_date: document.getElementById('ch-eway-date').value || null,
       notes: document.getElementById('ch-notes').value.trim(),
@@ -2021,6 +2050,20 @@ async function renderReports(range) {
       </div>
     </div>
     <div class="card" style="margin-top:16px;">
+      <div class="card-header" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <h3 style="margin:0;">Monthly Sales &amp; Collections Ledger</h3>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <select id="monthly-ledger-year" style="padding:4px 8px;border-radius:6px;border:1px solid #ccc;">
+            ${Array.from({length:5},(_,i)=>new Date().getFullYear()-i).map(y=>`<option value="${y}" ${y===new Date().getFullYear()?'selected':''}>${y}</option>`).join('')}
+          </select>
+          <button class="btn" id="export-monthly-ledger-excel-btn">Export Excel</button>
+          <button class="btn" id="print-monthly-ledger-pdf-btn">Print / PDF</button>
+        </div>
+      </div>
+      <div class="settings-note">Summarises every month's invoiced total, payments received, and outstanding balance for the selected year.</div>
+      <div id="monthly-ledger-table-wrap" style="margin-top:12px;"></div>
+    </div>
+    <div class="card" style="margin-top:16px;">
       <div class="card-header">
         <h3>Document Audit Log</h3>
         <select id="audit-log-filter">
@@ -2069,6 +2112,132 @@ async function renderReports(range) {
   document.getElementById('report-range').onchange = (e) => {
     renderReports(getDateRangePreset(e.target.value));
   };
+
+  // ─── Monthly Ledger ──────────────────────────────────────────────────────
+  const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  async function renderMonthlyLedger(year) {
+    const wrap = document.getElementById('monthly-ledger-table-wrap');
+    if (!wrap) return;
+    wrap.innerHTML = `<div class="inline-note">Loading…</div>`;
+    const ledger = await window.api.reports.monthlyLedger(year);
+    if (!ledger || !ledger.months || ledger.months.length === 0) {
+      wrap.innerHTML = `<div class="inline-note">No invoice data found for ${year}.</div>`;
+      return;
+    }
+    const fmt = (n) => `₹${Number(n || 0).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}`;
+    wrap.innerHTML = `
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Month</th>
+            <th class="r">Invoices</th>
+            <th class="r">Total Invoiced</th>
+            <th class="r">Payments Received</th>
+            <th class="r">Outstanding Balance</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${ledger.months.map((m, idx) => `
+            <tr>
+              <td><strong>${MONTH_NAMES[m.month - 1]} ${year}</strong></td>
+              <td class="r mono">${m.invoice_count}</td>
+              <td class="r mono">${fmt(m.total_invoiced)}</td>
+              <td class="r mono" style="color:#1a7f4b;">${fmt(m.payments_received)}</td>
+              <td class="r mono" style="color:${m.outstanding_balance > 0 ? '#c0392b' : '#1a7f4b'};">${fmt(m.outstanding_balance)}</td>
+              <td>${m.invoice_count > 0 ? `<button class="btn btn-sm view-month-details" data-idx="${idx}" style="white-space:nowrap;">View Details</button>` : ''}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+        <tfoot>
+          <tr style="font-weight:700;border-top:2px solid #ccc;">
+            <td>Year Total</td>
+            <td class="r mono">${ledger.months.reduce((s,m)=>s+m.invoice_count,0)}</td>
+            <td class="r mono">${fmt(ledger.months.reduce((s,m)=>s+m.total_invoiced,0))}</td>
+            <td class="r mono" style="color:#1a7f4b;">${fmt(ledger.months.reduce((s,m)=>s+m.payments_received,0))}</td>
+            <td class="r mono" style="color:#c0392b;">${fmt(ledger.months.reduce((s,m)=>s+m.outstanding_balance,0))}</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    `;
+    wrap.querySelectorAll('.view-month-details').forEach(btn => {
+      btn.onclick = () => {
+        const m = ledger.months[Number(btn.dataset.idx)];
+        const fmt2 = (n) => `₹${Number(n || 0).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}`;
+        openModal(`
+          <div class="modal-header">
+            <h2>${MONTH_NAMES[m.month-1]} ${year} — Invoice Breakdown</h2>
+            <button class="modal-close">&times;</button>
+          </div>
+          <div class="modal-body">
+            ${m.invoices && m.invoices.length > 0 ? `
+              <table class="data-table">
+                <thead><tr>
+                  <th>Invoice No.</th>
+                  <th>Bilty / LR</th>
+                  <th>Date</th>
+                  <th>Customer</th>
+                  <th class="r">Total</th>
+                  <th class="r">Paid</th>
+                  <th class="r">Balance</th>
+                  <th>Status</th>
+                </tr></thead>
+                <tbody>
+                  ${m.invoices.map(inv => `
+                    <tr>
+                      <td class="mono">${escapeHtml(inv.invoice_number || '—')}</td>
+                      <td class="mono">${escapeHtml(inv.bilty_number || '—')}</td>
+                      <td>${formatShortDate(inv.issue_date)}</td>
+                      <td>${escapeHtml(inv.customer_name || '—')}</td>
+                      <td class="r mono">${fmt2(inv.total)}</td>
+                      <td class="r mono" style="color:#1a7f4b;">${fmt2(inv.paid)}</td>
+                      <td class="r mono" style="color:${inv.balance > 0 ? '#c0392b' : '#1a7f4b'};">${fmt2(inv.balance)}</td>
+                      <td><span class="status-badge status-${(inv.payment_status||'').toLowerCase()}">${escapeHtml(inv.payment_status || inv.status || '—')}</span></td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            ` : '<div class="inline-note">No invoices in this month.</div>'}
+          </div>
+          <div class="modal-footer">
+            <button class="btn modal-cancel">Close</button>
+          </div>
+        `);
+      };
+    });
+  }
+
+  const ledgerYearSel = document.getElementById('monthly-ledger-year');
+  if (ledgerYearSel) {
+    renderMonthlyLedger(Number(ledgerYearSel.value));
+    ledgerYearSel.onchange = () => renderMonthlyLedger(Number(ledgerYearSel.value));
+  }
+
+  document.getElementById('export-monthly-ledger-excel-btn').onclick = async () => {
+    const year = Number(document.getElementById('monthly-ledger-year').value);
+    const btn = document.getElementById('export-monthly-ledger-excel-btn');
+    const orig = btn.textContent;
+    btn.textContent = 'Exporting…';
+    btn.disabled = true;
+    await window.api.reports.exportMonthlyLedgerExcel(year);
+    btn.textContent = orig;
+    btn.disabled = false;
+  };
+
+  document.getElementById('print-monthly-ledger-pdf-btn').onclick = async () => {
+    const year = Number(document.getElementById('monthly-ledger-year').value);
+    const btn = document.getElementById('print-monthly-ledger-pdf-btn');
+    const orig = btn.textContent;
+    btn.textContent = 'Preparing…';
+    btn.disabled = true;
+    await window.api.reports.printMonthlyLedgerPdf(year);
+    btn.textContent = orig;
+    btn.disabled = false;
+  };
+  // ─── End Monthly Ledger ──────────────────────────────────────────────────
+
 
   document.getElementById('backup-create-btn').onclick = async () => {
     const btn = document.getElementById('backup-create-btn');
@@ -2318,6 +2487,31 @@ async function renderSettings() {
       <div class="settings-actions">
         <button class="btn btn-primary" id="save-company-btn">Save Company Profile</button>
         <span class="save-status" id="company-save-status"></span>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <h3>Payment QR Code (UPI / Bank QR)</h3>
+      <div class="settings-note">Upload your UPI or bank payment QR code. It will be automatically printed on every invoice. The image persists until you replace or remove it.</div>
+      <div class="form-row" style="align-items:flex-start;gap:20px;flex-wrap:wrap;margin-top:12px;">
+        <div style="flex:1;min-width:200px;">
+          <div class="form-group">
+            <label>UPI ID <span style="font-weight:400;color:#888;">(optional — auto-generates QR if no image uploaded)</span></label>
+            <input id="s-upi-id" value="${escapeAttr(company.upi_id || '')}" placeholder="e.g. businessname@upi">
+          </div>
+          <div class="form-group" style="margin-top:8px;">
+            <label>Upload QR Code Image</label>
+            <input type="file" id="s-qr-upload" accept="image/*" style="margin-top:4px;">
+          </div>
+          <div class="settings-actions" style="margin-top:8px;">
+            <button class="btn btn-primary" id="save-qr-btn">Save QR Settings</button>
+            <button class="btn" id="remove-qr-btn" style="${company.upi_qr_image ? '' : 'display:none;'}">Remove QR Image</button>
+            <span class="save-status" id="qr-save-status"></span>
+          </div>
+        </div>
+        <div id="qr-preview-wrap" style="flex-shrink:0;">
+          ${company.upi_qr_image ? `<div style="text-align:center;"><img id="qr-preview-img" src="${company.upi_qr_image}" alt="QR Code" style="width:120px;height:120px;object-fit:contain;border:1px solid #ddd;border-radius:8px;padding:6px;background:#fff;"><div style="font-size:11px;color:#888;margin-top:4px;">Current QR</div></div>` : `<div id="qr-preview-empty" style="width:120px;height:120px;display:flex;align-items:center;justify-content:center;border:1px dashed #ccc;border-radius:8px;color:#aaa;font-size:12px;text-align:center;">No QR<br>uploaded</div>`}
+        </div>
       </div>
     </div>
 
@@ -2597,6 +2791,56 @@ async function renderSettings() {
     status.className = 'save-status success';
     setTimeout(() => { status.textContent = ''; }, 2000);
   };
+
+  // ─── QR Code handlers ─────────────────────────────────────────────────────
+  const qrUploadInput = document.getElementById('s-qr-upload');
+  const qrPreviewWrap = document.getElementById('qr-preview-wrap');
+  let pendingQrDataUrl = null;
+
+  if (qrUploadInput) {
+    qrUploadInput.onchange = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        pendingQrDataUrl = ev.target.result;
+        qrPreviewWrap.innerHTML = `<div style="text-align:center;"><img id="qr-preview-img" src="${pendingQrDataUrl}" alt="QR Code" style="width:120px;height:120px;object-fit:contain;border:1px solid #ddd;border-radius:8px;padding:6px;background:#fff;"><div style="font-size:11px;color:#888;margin-top:4px;">Preview (unsaved)</div></div>`;
+        const removeQrBtn = document.getElementById('remove-qr-btn');
+        if (removeQrBtn) removeQrBtn.style.display = '';
+      };
+      reader.readAsDataURL(file);
+    };
+  }
+
+  document.getElementById('save-qr-btn').onclick = async () => {
+    const qrStatus = document.getElementById('qr-save-status');
+    const upiId = document.getElementById('s-upi-id').value.trim();
+    // Save UPI ID via company update
+    await window.api.company.update({
+      ...(await window.api.company.get()),
+      upi_id: upiId || null
+    });
+    // Save QR image if a new one was selected
+    if (pendingQrDataUrl !== null) {
+      await window.api.company.updateQr(pendingQrDataUrl);
+      pendingQrDataUrl = null;
+    }
+    qrStatus.textContent = 'Saved';
+    qrStatus.className = 'save-status success';
+    setTimeout(() => { qrStatus.textContent = ''; }, 2000);
+  };
+
+  document.getElementById('remove-qr-btn').onclick = async () => {
+    await window.api.company.updateQr(null);
+    pendingQrDataUrl = null;
+    qrPreviewWrap.innerHTML = `<div id="qr-preview-empty" style="width:120px;height:120px;display:flex;align-items:center;justify-content:center;border:1px dashed #ccc;border-radius:8px;color:#aaa;font-size:12px;text-align:center;">No QR<br>uploaded</div>`;
+    document.getElementById('remove-qr-btn').style.display = 'none';
+    const qrStatus = document.getElementById('qr-save-status');
+    qrStatus.textContent = 'QR Removed';
+    qrStatus.className = 'save-status success';
+    setTimeout(() => { qrStatus.textContent = ''; }, 2000);
+  };
+  // ─── End QR handlers ──────────────────────────────────────────────────────
 
   document.getElementById('save-defaults-btn').onclick = async () => {
     await window.api.settings.update({

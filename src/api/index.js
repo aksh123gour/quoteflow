@@ -15,7 +15,7 @@ import {
 } from '../utils.js';
 import {
   buildQuotationHtml, buildInvoiceHtml, buildChallanHtml,
-  buildCreditDebitNoteHtml, DEFAULT_BLOCKS, printHtmlAsPdf
+  buildCreditDebitNoteHtml, DEFAULT_BLOCKS, printHtmlAsPdf, generatePdfFile
 } from '../docs/pdf.js';
 import { exportDocumentExcel, exportSalesRegister, exportMonthlyLedgerExcel } from '../docs/excel.js';
 
@@ -665,6 +665,17 @@ export function buildWindowApi() {
         printHtmlAsPdf(html, `Export — ${quote.quote_number}`);
         return { success: true };
       },
+      getPdfFile: async (id) => {
+        const quote = await getFullQuoteById(id);
+        if (!quote) throw new Error('Quotation not found');
+        const company = await db.companies.get(quote.company_id);
+        const { template, letterheadPath } = await resolveTemplateAndLetterhead(quote);
+        const layout = await api.layout.getEffective('quotation') || {};
+        const html = buildQuotationHtml(quote, company, template, letterheadPath, layout);
+        const fileName = `Quotation_${quote.quote_number || id}.pdf`.replace(/[\/\\?%*:|"<>]/g, '_');
+        const file = await generatePdfFile(html, fileName);
+        return { file, fileName, docNumber: quote.quote_number };
+      },
       exportSelectedPdf: async (ids) => {
         for (const id of ids) {
           const quote = await getFullQuoteById(id);
@@ -771,6 +782,17 @@ export function buildWindowApi() {
         const html = buildInvoiceHtml(invoice, company, template, letterheadPath, null, layout);
         printHtmlAsPdf(html, `Export — ${invoice.invoice_number}`);
         return { success: true };
+      },
+      getPdfFile: async (id) => {
+        const invoice = await getFullInvoiceById(id);
+        if (!invoice) throw new Error('Invoice not found');
+        const company = await db.companies.get(invoice.company_id);
+        const { template, letterheadPath } = await resolveTemplateAndLetterhead(invoice);
+        const layout = await api.layout.getEffective('invoice') || {};
+        const html = buildInvoiceHtml(invoice, company, template, letterheadPath, null, layout);
+        const fileName = `Invoice_${invoice.invoice_number || id}.pdf`.replace(/[\/\\?%*:|"<>]/g, '_');
+        const file = await generatePdfFile(html, fileName);
+        return { file, fileName, docNumber: invoice.invoice_number };
       },
       exportExcel: async (id) => {
         const invoice = await getFullInvoiceById(id);
@@ -904,6 +926,17 @@ export function buildWindowApi() {
         printHtmlAsPdf(html, `Export — ${challan.challan_number}`);
         return { success: true };
       },
+      getPdfFile: async (id) => {
+        const challan = await getFullChallanById(id);
+        if (!challan) throw new Error('Challan not found');
+        const company = await db.companies.get(challan.company_id);
+        const letterheadPath = await resolveLetterhead(challan.letterhead_id);
+        const layout = await api.layout.getEffective('challan') || {};
+        const html = buildChallanHtml(challan, company, letterheadPath, layout);
+        const fileName = `Challan_${challan.challan_number || id}.pdf`.replace(/[\/\\?%*:|"<>]/g, '_');
+        const file = await generatePdfFile(html, fileName);
+        return { file, fileName, docNumber: challan.challan_number };
+      },
       exportWord: async (id) => api.challans.exportPdf(id),
       updateEwayBill: async (id, data) => {
         await db.delivery_challans.update(id, {
@@ -992,6 +1025,17 @@ export function buildWindowApi() {
         const html = buildCreditDebitNoteHtml(note, company, letterheadPath, layout);
         printHtmlAsPdf(html, `Export — ${note.note_number}`);
         return { success: true };
+      },
+      getPdfFile: async (id) => {
+        const note = await getFullNoteById(id);
+        if (!note) throw new Error('Note not found');
+        const company = await db.companies.get(note.company_id);
+        const letterheadPath = await resolveLetterhead(note.letterhead_id);
+        const layout = await api.layout.getEffective('note') || {};
+        const html = buildCreditDebitNoteHtml(note, company, letterheadPath, layout);
+        const fileName = `${note.note_type || 'Note'}_${note.note_number || id}.pdf`.replace(/[\/\\?%*:|"<>]/g, '_');
+        const file = await generatePdfFile(html, fileName);
+        return { file, fileName, docNumber: note.note_number };
       },
       exportExcel: async (id) => {
         const note = await getFullNoteById(id);

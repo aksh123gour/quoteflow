@@ -1,4 +1,5 @@
 import QRCode from 'qrcode-svg';
+import html2pdf from 'html2pdf.js';
 
 export const DEFAULT_BLOCKS = [
   { type: 'header', enabled: true, showCompanyName: true, showCompanyContact: true },
@@ -474,4 +475,38 @@ export function printHtmlAsPdf(html, title) {
     overlay.classList.add('hidden');
     URL.revokeObjectURL(url);
   };
+}
+
+export async function generatePdfBlob(html, fileName = 'document.pdf') {
+  const container = document.createElement('div');
+  container.style.position = 'fixed';
+  container.style.left = '-9999px';
+  container.style.top = '0';
+  container.style.width = '794px';
+  container.style.background = '#ffffff';
+  container.innerHTML = html;
+  document.body.appendChild(container);
+
+  try {
+    const opt = {
+      margin:       [10, 10, 10, 10],
+      filename:     fileName,
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { scale: 2, useCORS: true, logging: false },
+      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+    const blob = await html2pdf().set(opt).from(container).outputPdf('blob');
+    return blob;
+  } finally {
+    if (container.parentNode) {
+      container.parentNode.removeChild(container);
+    }
+  }
+}
+
+export async function generatePdfFile(html, fileName = 'document.pdf') {
+  const safeName = String(fileName || 'document').replace(/[\/\\?%*:|"<>]/g, '_');
+  const finalName = safeName.endsWith('.pdf') ? safeName : `${safeName}.pdf`;
+  const blob = await generatePdfBlob(html, finalName);
+  return new File([blob], finalName, { type: 'application/pdf' });
 }

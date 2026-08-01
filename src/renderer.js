@@ -3678,7 +3678,7 @@ function openExportDropdown(wrap, docType, id) {
     { cls: 'edi-pdf',     label: 'Export PDF',         action: async () => { setLoading(btn, true); await api.exportPdf(id); setLoading(btn, false); } },
     { cls: 'edi-word',    label: 'Export Word (.docx)', action: async () => { setLoading(btn, true); await api.exportWord(id); setLoading(btn, false); } },
     hasExcel && { cls: 'edi-excel', label: 'Export Excel (.xlsx)', action: async () => { setLoading(btn, true); await api.exportExcel(id); setLoading(btn, false); } },
-    { cls: 'edi-share',   label: 'Share via WhatsApp', action: () => shareViaWhatsApp(docType, id) },
+    { cls: 'edi-share',   label: 'Share via WhatsApp', action: async () => { setLoading(btn, true); await shareViaWhatsApp(docType, id); setLoading(btn, false); } },
   ].filter(Boolean);
 
   items.forEach((item) => {
@@ -3708,10 +3708,12 @@ function openExportDropdown(wrap, docType, id) {
   if (left + dropW > window.innerWidth - 8) left = window.innerWidth - dropW - 8;
 
   // If dropdown would go off bottom, flip it above the button
-  if (top + 260 > window.innerHeight) top = rect.top - 260;
+  if (top + 200 > window.innerHeight && rect.top > 200) {
+    top = rect.top - 200;
+  }
 
-  dropdown.style.top  = top + 'px';
-  dropdown.style.left = left + 'px';
+  dropdown.style.top  = `${top}px`;
+  dropdown.style.left = `${left}px`;
 
   // Close on scroll or outside click
   const closeHandler = (e) => {
@@ -3740,33 +3742,63 @@ function setLoading(btn, isLoading) {
 }
 
 async function shareViaWhatsApp(docType, id) {
-  // First generate the PDF file, then open WhatsApp share sheet
-  // On desktop: opens web.whatsapp.com with a prompt
-  // On mobile: uses the native Share API if available
   const api = API_MAP[docType]?.();
   if (!api) return;
 
-  // Try native Web Share API first (works on mobile browsers)
-  if (navigator.share) {
-    try {
-      // Generate a blob URL for sharing
-      const result = await api.exportPdf(id);
-      // If the API returns a file path or blob, we share it
-      // Otherwise fall back to WhatsApp link with a message
-      await navigator.share({
-        title: 'QuoteFlow Document',
-        text: 'Please find the attached document from QuoteFlow.',
-      });
-      return;
-    } catch (err) {
-      if (err.name !== 'AbortError') console.error('Share failed:', err);
-      return;
+  try {
+    // 1. Generate the actual PDF File object
+    const res = await api.getPdfFile(id);
+    if (!res || !res.file) {
+      throw new Error('Failed to generate PDF file.');
+    }
+
+    const { file, fileName, docNumber } = res;
+    const shareTitle = docNumber || 'QuoteFlow Document';
+    const messageText = `Please find ${docNumber ? `document ${docNumber}` : 'the attached document'} from QuoteFlow.`;
+
+    // 2. Check if device & browser support sharing files via Web Share API
+    const canShareFiles = typeof navigator.share === 'function' &&
+                          typeof navigator.canShare === 'function' &&
+                          navigator.canShare({ files: [file] });
+
+    if (canShareFiles) {
+      try {
+        await navigator.share({
+          title: shareTitle,
+          text: messageText,
+          files: [file]
+        });
+        return;
+      } catch (err) {
+        if (err.name === 'AbortError') return; // User closed system share sheet
+        console.warn('Native file share failed, falling back to download:', err);
+      }
+    }
+
+    // 3. Fallback for desktop / unsupported browsers:
+    // Download the PDF file to user's device and open WhatsApp with an explanatory message
+    const blobUrl = URL.createObjectURL(file);
+    const downloadLink = document.createElement('a');
+    downloadLink.href = blobUrl;
+    downloadLink.download = fileName;
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const promptMessage = encodeURIComponent(`${messageText}\n\n(The PDF file "${fileName}" has been downloaded to your device. Please attach it to this chat.)`);
+    const waUrl = isMobile
+      ? `https://api.whatsapp.com/send?text=${promptMessage}`
+      : `https://web.whatsapp.com/send?text=${promptMessage}`;
+
+    window.open(waUrl, '_blank');
+  } catch (err) {
+    console.error('WhatsApp share error:', err);
+    if (typeof openInfo === 'function') {
+      openInfo('Could not generate PDF for sharing: ' + (err.message || err));
     }
   }
-
-  // Desktop fallback: open WhatsApp Web with a pre-filled message
-  const message = encodeURIComponent('Please find the attached document from QuoteFlow.');
-  window.open(`https://web.whatsapp.com/send?text=${message}`, '_blank');
 }
 
 function attachExportMenus() {

@@ -545,53 +545,50 @@ async function shareFromPreview(html, docNumber, docTitle) {
 }
 
 // Generates a PDF Blob from a full HTML document string.
-// IMPORTANT: Renders in the MAIN document DOM (not inside an iframe).
-// html2canvas cannot cross iframe browsing context boundaries — this approach avoids that.
+// Renders the container inside a temporary viewport-aligned overlay at (0,0)
+// so html2canvas can capture all pixels without viewport clipping.
 export async function generatePdfBlob(html, fileName = 'document.pdf') {
   const { default: html2pdf } = await import('html2pdf.js');
 
-  // Parse the HTML and extract styles + body content
-  const parser  = new DOMParser();
-  const parsed  = parser.parseFromString(html, 'text/html');
-  const rawCSS  = Array.from(parsed.querySelectorAll('style'))
-                    .map(s => s.textContent).join('\n')
-                    .replace(/@page\s*\{[^}]*\}/g, ''); // @page unsupported by html2canvas
+  const parser = new DOMParser();
+  const parsed = parser.parseFromString(html, 'text/html');
+  const rawCSS = Array.from(parsed.querySelectorAll('style'))
+    .map(s => s.textContent).join('\n')
+    .replace(/@page\s*\{[^}]*\}/g, '');
 
-  // Inject styles into the main document head (temporary)
   const styleEl = document.createElement('style');
   styleEl.setAttribute('data-pdf-tmp', '1');
   styleEl.textContent = rawCSS;
   document.head.appendChild(styleEl);
 
-  // Create a hidden off-screen container at A4 pixel width (794px @ 96dpi)
-  // position:fixed at x:-9999px is off-screen yet still rendered + painted by the browser
+  const wrapper = document.createElement('div');
+  wrapper.setAttribute('data-pdf-tmp', '1');
+  wrapper.style.cssText = 'position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.4); z-index: 999999; display: flex; justify-content: center; align-items: flex-start; overflow-y: auto; padding: 20px; box-sizing: border-box;';
+
   const container = document.createElement('div');
-  container.setAttribute('data-pdf-tmp', '1');
-  container.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;background:#fff;overflow:visible;z-index:-9999;';
+  container.style.cssText = 'width: 794px; background: #ffffff; color: #191c1d; border-radius: 4px; padding: 24px; box-sizing: border-box; font-family: "Segoe UI", Arial, sans-serif;';
   container.innerHTML = parsed.body.innerHTML;
-  document.body.appendChild(container);
+  wrapper.appendChild(container);
+  document.body.appendChild(wrapper);
 
   try {
-    // Give browser time to apply CSS, calculate layout, and load fonts
-    await new Promise(r => setTimeout(r, 700));
+    await new Promise(r => setTimeout(r, 600));
 
     const opt = {
-      margin:      0,
+      margin:      [10, 10, 10, 10],
       filename:    fileName,
-      image:       { type: 'jpeg', quality: 0.97 },
+      image:       { type: 'jpeg', quality: 0.98 },
       html2canvas: {
         scale:           2,
         useCORS:         true,
         logging:         false,
-        windowWidth:     794,
-        scrollX:         0,
-        scrollY:         0,
         backgroundColor: '#ffffff',
       },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
     };
 
-    return await html2pdf().set(opt).from(container).outputPdf('blob');
+    const pdfBlob = await html2pdf().set(opt).from(container).outputPdf('blob');
+    return pdfBlob;
   } finally {
     document.querySelectorAll('[data-pdf-tmp]').forEach(el => el.remove());
   }

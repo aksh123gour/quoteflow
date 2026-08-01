@@ -154,23 +154,28 @@ export function buildQuotationHtml(quote, company, template, letterheadPath, lay
           </div>
         </div>
       </div>`,
-    items: () => `
+    items: () => {
+      const hasImages = quote.items.some(it => it.product_image);
+      return `
       <table class="items">
         <thead><tr>
-          <th style="width:5%">#</th><th style="width:42%">Description</th>
+          ${hasImages ? '<th style="width:44px;padding:6px;"></th>' : ''}
+          <th style="width:${hasImages ? '5%' : '5%'}">#</th><th style="width:${hasImages ? '38%' : '42%'}">Description</th>
           <th style="width:10%" class="c">Qty</th><th style="width:16%" class="r">Unit Price</th>
           <th style="width:10%" class="c">GST</th><th style="width:17%" class="r">Amount</th>
         </tr></thead>
         <tbody>
           ${quote.items.map((it, i) => `
             <tr>
+              ${hasImages ? `<td style="padding:6px;vertical-align:middle;">${it.product_image ? `<img src="${it.product_image}" style="width:36px;height:36px;object-fit:contain;border-radius:3px;display:block;">` : ''}</td>` : ''}
               <td class="c">${i + 1}</td>
               <td>${esc(it.description)}${it.hsn_code ? `<div class="hsn">HSN: ${esc(it.hsn_code)}</div>` : ''}</td>
               <td class="r">${it.qty}</td><td class="r">₹${Number(it.unit_price).toFixed(2)}</td>
               <td class="c">${it.gst_rate}%</td><td class="r">₹${Number(it.line_total).toFixed(2)}</td>
             </tr>`).join('')}
         </tbody>
-      </table>`,
+      </table>`;
+    },
     totals: () => `
       <div class="totals"><div class="totals-box">
         <div class="totals-line"><span>Subtotal</span><span>₹${Number(quote.subtotal).toFixed(2)}</span></div>
@@ -478,28 +483,41 @@ export function printHtmlAsPdf(html, title) {
 }
 
 export async function generatePdfBlob(html, fileName = 'document.pdf') {
-  const container = document.createElement('div');
-  container.style.position = 'fixed';
-  container.style.left = '-9999px';
-  container.style.top = '0';
-  container.style.width = '794px';
-  container.style.background = '#ffffff';
-  container.innerHTML = html;
-  document.body.appendChild(container);
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'fixed';
+  iframe.style.left = '0';
+  iframe.style.top = '0';
+  iframe.style.width = '794px';
+  iframe.style.height = '1123px';
+  iframe.style.zIndex = '-99999';
+  iframe.style.opacity = '0';
+  iframe.style.border = 'none';
+  iframe.style.pointerEvents = 'none';
+  document.body.appendChild(iframe);
 
   try {
+    const doc = iframe.contentWindow.document;
+    doc.open();
+    doc.write(html);
+    doc.close();
+
+    // Wait for fonts & images to render
+    await new Promise((r) => setTimeout(r, 400));
+
     const opt = {
-      margin:       [10, 10, 10, 10],
+      margin:       [8, 8, 8, 8],
       filename:     fileName,
       image:        { type: 'jpeg', quality: 0.98 },
-      html2canvas:  { scale: 2, useCORS: true, logging: false },
+      html2canvas:  { scale: 2, useCORS: true, logging: false, windowWidth: 794 },
       jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
-    const blob = await html2pdf().set(opt).from(container).outputPdf('blob');
+
+    const target = doc.body || doc.documentElement;
+    const blob = await html2pdf().set(opt).from(target).outputPdf('blob');
     return blob;
   } finally {
-    if (container.parentNode) {
-      container.parentNode.removeChild(container);
+    if (iframe.parentNode) {
+      iframe.parentNode.removeChild(iframe);
     }
   }
 }

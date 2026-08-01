@@ -26,7 +26,15 @@ async function getFullQuoteById(id) {
   if (!quote) return null;
   const customer = await db.customers.get(quote.customer_id);
   if (!customer) return null;
-  const items = await db.quotation_items.where('quotation_id').equals(id).sortBy('id');
+  const rawItems = await db.quotation_items.where('quotation_id').equals(id).sortBy('id');
+  // Enrich items with product image
+  const items = await Promise.all(rawItems.map(async (it) => {
+    if (it.product_id) {
+      const prod = await db.products.get(it.product_id);
+      return { ...it, product_image: prod?.image || null };
+    }
+    return { ...it, product_image: null };
+  }));
   return {
     ...quote,
     contact_name: customer.contact_name,
@@ -414,14 +422,19 @@ export function buildWindowApi() {
       },
       create: async (data) => {
         const companyId = await getActiveCompanyId();
-        const id = await db.products.add({
+        const payload = {
           company_id: companyId, ...normalizeProduct(data),
+          image: data.image || null,
           created_at: new Date().toISOString()
-        });
+        };
+        const id = await db.products.add(payload);
         return { id };
       },
       update: async (id, data) => {
-        await db.products.update(id, normalizeProduct(data));
+        const updates = normalizeProduct(data);
+        // Only write image if explicitly provided (prevents wiping on edit without changing image)
+        if ('image' in data) updates.image = data.image || null;
+        await db.products.update(id, updates);
         return { success: true };
       },
       delete: async (id) => {

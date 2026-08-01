@@ -443,6 +443,7 @@ async function renderProducts() {
       : `<table class="data-table">
           <thead>
             <tr>
+              <th style="width:56px"></th>
               <th>Name</th>
               <th>SKU</th>
               <th>Category</th>
@@ -454,7 +455,13 @@ async function renderProducts() {
           <tbody>
             ${products.map((p) => `
               <tr>
-                <td>${escapeHtml(p.name)}</td>
+                <td style="padding:6px;">
+                  ${p.image
+                    ? `<img src="${p.image}" alt="" style="width:44px;height:44px;object-fit:contain;border-radius:4px;border:1px solid #e5e7eb;background:#f9fafb;display:block;">`
+                    : `<div style="width:44px;height:44px;border-radius:4px;border:1px dashed #d1d5db;background:#f9fafb;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:18px;">&#128247;</div>`
+                  }
+                </td>
+                <td><strong>${escapeHtml(p.name)}</strong>${p.description ? `<div style="font-size:11px;color:#6b7280;margin-top:2px;">${escapeHtml(p.description.slice(0,60))}${p.description.length>60?'…':''}</div>` : ''}</td>
                 <td>${escapeHtml(p.sku || '—')}</td>
                 <td>${escapeHtml(p.category_name || '—')}</td>
                 <td>₹${Number(p.base_price).toFixed(2)}</td>
@@ -548,12 +555,62 @@ async function openProductForm(product) {
         <label>Description</label>
         <textarea id="f-description" rows="2">${escapeHtml(product?.description || '')}</textarea>
       </div>
+      <div class="form-group">
+        <label>Product Image <span style="font-weight:400;color:#6b7280;">(optional – shown in product list &amp; quotations)</span></label>
+        <div style="display:flex;align-items:flex-start;gap:14px;margin-top:4px;">
+          <div id="prod-img-preview" style="width:80px;height:80px;border-radius:8px;border:1px solid #e5e7eb;background:#f9fafb;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">
+            ${product?.image
+              ? `<img src="${product.image}" style="width:100%;height:100%;object-fit:contain;"/>`
+              : `<span style="font-size:28px;color:#d1d5db;">&#128247;</span>`
+            }
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <label class="btn" style="cursor:pointer;margin:0;" for="prod-img-input">Upload Image</label>
+            <input id="prod-img-input" type="file" accept="image/*" style="display:none;">
+            <button id="prod-img-remove" class="btn" style="color:#ba1a1a;border-color:#ba1a1a;background:transparent;${product?.image ? '' : 'display:none;'}">Remove Image</button>
+            <span style="font-size:11px;color:#6b7280;">JPG, PNG, WebP. Max 2 MB.</span>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn modal-cancel">Cancel</button>
       <button class="btn btn-primary" id="save-product-btn">${isEdit ? 'Save Changes' : 'Add Product'}</button>
     </div>
   `);
+
+  // ── Image upload ──────────────────────────────────────────────────────────
+  let _productImageDataUrl = product?.image || null; // tracks current image state
+
+  document.getElementById('prod-img-input').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      openInfo('Image must be under 2 MB.');
+      e.target.value = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      _productImageDataUrl = ev.target.result;
+      const preview = document.getElementById('prod-img-preview');
+      preview.innerHTML = `<img src="${_productImageDataUrl}" style="width:100%;height:100%;object-fit:contain;">`;
+      const removeBtn = document.getElementById('prod-img-remove');
+      if (removeBtn) removeBtn.style.display = '';
+    };
+    reader.readAsDataURL(file);
+  });
+
+  const removeBtn = document.getElementById('prod-img-remove');
+  if (removeBtn) {
+    removeBtn.onclick = () => {
+      _productImageDataUrl = null;
+      const preview = document.getElementById('prod-img-preview');
+      preview.innerHTML = `<span style="font-size:28px;color:#d1d5db;">&#128247;</span>`;
+      removeBtn.style.display = 'none';
+      document.getElementById('prod-img-input').value = '';
+    };
+  }
 
   document.getElementById('save-product-btn').onclick = async () => {
     const data = {
@@ -564,7 +621,8 @@ async function openProductForm(product) {
       base_price: document.getElementById('f-price').value,
       gst_rate: document.getElementById('f-gst-rate').value,
       hsn_code: document.getElementById('f-hsn').value.trim(),
-      description: document.getElementById('f-description').value.trim()
+      description: document.getElementById('f-description').value.trim(),
+      image: _productImageDataUrl  // always pass so API knows the current state
     };
 
     if (!data.name || data.base_price === '') {

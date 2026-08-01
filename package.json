@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:all": "vite build && cd ../mobile-app && npm run build && powershell -Command \"Copy-Item -Recurse -Force '../mobile-app/dist/*' 'dist/mobile'\"",
+    "build:all": "node scripts/build-all.js",
     "preview": "vite preview"
   },
   "devDependencies": {

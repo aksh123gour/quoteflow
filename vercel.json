@@ -1,4 +1,6 @@
 {
+  "buildCommand": "node scripts/build-all.js",
+  "outputDirectory": "dist",
   "github": {
     "silent": false
   },

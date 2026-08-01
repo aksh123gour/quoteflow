@@ -497,87 +497,109 @@ export function printHtmlAsPdf(html, title, shareContext = null) {
   };
 }
 
-// Share the document HTML from the preview overlay via WhatsApp
-// On mobile: uses Web Share API to share the .html file (renders in any browser)
-// On desktop: downloads the .html and opens WhatsApp Web with a message
+// Share the document from the preview overlay via WhatsApp.
+// Generates a real PDF file (html2pdf DOM-injection) and shares it.
 async function shareFromPreview(html, docNumber, docTitle) {
-  const safeName = `${docTitle || 'Document'}${docNumber ? '_' + docNumber : ''}`
-    .replace(/[/\\?%*:|"<>\s]/g, '_');
-  const fileName = `${safeName}.html`;
-  const messageText = `Please find ${docNumber ? 'document ' + docNumber : 'the attached document'} from QuoteFlow.`;
+  const safeName = (docTitle || 'Document') + (docNumber ? '_' + docNumber : '');
+  const pdfName  = safeName.replace(/[\/\\?%*:|"<>\s]/g, '_') + '.pdf';
+  const msgText  = 'Please find ' + (docNumber ? 'document ' + docNumber : 'the attached document') + ' from QuoteFlow.';
 
-  const htmlBlob = new Blob([html], { type: 'text/html' });
-  const htmlFile = new File([htmlBlob], fileName, { type: 'text/html' });
+  const waBtn = document.getElementById('pdf-wa-share-btn');
+  const savedLabel = waBtn ? waBtn.innerHTML : '';
+  if (waBtn) { waBtn.disabled = true; waBtn.innerHTML = '<span style="opacity:.7">Generating PDF\u2026</span>'; }
 
-  // Try native Web Share API with file (works on Android Chrome / Samsung Internet)
-  if (typeof navigator.share === 'function' &&
-      typeof navigator.canShare === 'function' &&
-      navigator.canShare({ files: [htmlFile] })) {
-    try {
-      await navigator.share({ title: docTitle, text: messageText, files: [htmlFile] });
-      return;
-    } catch (err) {
-      if (err.name === 'AbortError') return;
-      console.warn('File share not supported, falling back:', err);
+  try {
+    const pdfBlob = await generatePdfBlob(html, pdfName);
+    const pdfFile = new File([pdfBlob], pdfName, { type: 'application/pdf' });
+
+    if (waBtn) { waBtn.disabled = false; waBtn.innerHTML = savedLabel; }
+
+    // Try native Web Share API with the PDF file
+    if (typeof navigator.share === 'function' &&
+        typeof navigator.canShare === 'function' &&
+        navigator.canShare({ files: [pdfFile] })) {
+      try {
+        await navigator.share({ title: docTitle, text: msgText, files: [pdfFile] });
+        return;
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+        console.warn('Native share rejected, falling back:', err);
+      }
     }
+
+    // Fallback: download PDF + open WhatsApp
+    const blobUrl = URL.createObjectURL(pdfFile);
+    const a = document.createElement('a');
+    a.href = blobUrl; a.download = pdfName;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const waMsg = encodeURIComponent(msgText + '\n\n("' + pdfName + '" downloaded \u2014 please attach it to this chat.)');
+    window.open(isMobile ? 'https://api.whatsapp.com/send?text=' + waMsg : 'https://web.whatsapp.com/send?text=' + waMsg, '_blank');
+  } catch (err) {
+    if (waBtn) { waBtn.disabled = false; waBtn.innerHTML = savedLabel; }
+    console.error('PDF share error:', err);
+    alert('Could not generate PDF: ' + (err.message || err));
   }
-
-  // Fallback: download the HTML file + open WhatsApp
-  const blobUrl = URL.createObjectURL(htmlBlob);
-  const a = document.createElement('a');
-  a.href = blobUrl;
-  a.download = fileName;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
-
-  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-  const waMsg = encodeURIComponent(`${messageText}\n\n("${fileName}" downloaded — open it in your browser, then print to PDF and attach here.)`);
-  window.open(
-    isMobile ? `https://api.whatsapp.com/send?text=${waMsg}` : `https://web.whatsapp.com/send?text=${waMsg}`,
-    '_blank'
-  );
 }
 
+// Generates a PDF Blob from a full HTML document string.
+// IMPORTANT: Renders in the MAIN document DOM (not inside an iframe).
+// html2canvas cannot cross iframe browsing context boundaries — this approach avoids that.
 export async function generatePdfBlob(html, fileName = 'document.pdf') {
-  // Legacy function retained for compatibility. For sharing, use printHtmlAsPdf + shareFromPreview.
   const { default: html2pdf } = await import('html2pdf.js');
-  const parser = new DOMParser();
-  const parsed = parser.parseFromString(html, 'text/html');
-  const styleContent = Array.from(parsed.querySelectorAll('style')).map(s => s.textContent).join('\n');
-  const bodyContent = parsed.body.innerHTML;
 
+  // Parse the HTML and extract styles + body content
+  const parser  = new DOMParser();
+  const parsed  = parser.parseFromString(html, 'text/html');
+  const rawCSS  = Array.from(parsed.querySelectorAll('style'))
+                    .map(s => s.textContent).join('\n')
+                    .replace(/@page\s*\{[^}]*\}/g, ''); // @page unsupported by html2canvas
+
+  // Inject styles into the main document head (temporary)
   const styleEl = document.createElement('style');
-  styleEl.id = '__pdf-export-styles';
-  styleEl.textContent = styleContent.replace(/@page[^}]*}/g, '');
+  styleEl.setAttribute('data-pdf-tmp', '1');
+  styleEl.textContent = rawCSS;
   document.head.appendChild(styleEl);
 
+  // Create a hidden off-screen container at A4 pixel width (794px @ 96dpi)
+  // position:fixed at x:-9999px is off-screen yet still rendered + painted by the browser
   const container = document.createElement('div');
-  container.id = '__pdf-export-container';
-  container.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;background:#fff;z-index:-1;font-family:Arial,sans-serif;';
-  container.innerHTML = bodyContent;
+  container.setAttribute('data-pdf-tmp', '1');
+  container.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;background:#fff;overflow:visible;z-index:-9999;';
+  container.innerHTML = parsed.body.innerHTML;
   document.body.appendChild(container);
 
   try {
-    await new Promise(r => setTimeout(r, 600));
+    // Give browser time to apply CSS, calculate layout, and load fonts
+    await new Promise(r => setTimeout(r, 700));
+
     const opt = {
-      margin: [8, 8, 8, 8],
-      filename: fileName,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, logging: false, windowWidth: 794 },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      margin:      0,
+      filename:    fileName,
+      image:       { type: 'jpeg', quality: 0.97 },
+      html2canvas: {
+        scale:           2,
+        useCORS:         true,
+        logging:         false,
+        windowWidth:     794,
+        scrollX:         0,
+        scrollY:         0,
+        backgroundColor: '#ffffff',
+      },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
     };
+
     return await html2pdf().set(opt).from(container).outputPdf('blob');
   } finally {
-    document.getElementById('__pdf-export-styles')?.remove();
-    document.getElementById('__pdf-export-container')?.remove();
+    document.querySelectorAll('[data-pdf-tmp]').forEach(el => el.remove());
   }
 }
 
 export async function generatePdfFile(html, fileName = 'document.pdf') {
-  const safeName = String(fileName || 'document').replace(/[\/\\?%*:|"<>]/g, '_');
-  const finalName = safeName.endsWith('.pdf') ? safeName : `${safeName}.pdf`;
-  const blob = await generatePdfBlob(html, finalName);
+  const safeName  = String(fileName || 'document').replace(/[\/\\?%*:|"<>]/g, '_');
+  const finalName = safeName.endsWith('.pdf') ? safeName : safeName + '.pdf';
+  const blob      = await generatePdfBlob(html, finalName);
   return new File([blob], finalName, { type: 'application/pdf' });
 }

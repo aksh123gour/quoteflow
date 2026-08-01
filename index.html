@@ -10,6 +10,17 @@
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
   <link rel="icon" href="/icons/icon-192.png">
   <link rel="stylesheet" href="styles.css">
+  <script>
+    (function() {
+      var userPref = localStorage.getItem('quoteflow_mode_preference');
+      if (userPref === 'desktop') return;
+      var isMobileUA = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+      var isNarrowViewport = window.innerWidth < 768;
+      if ((isMobileUA || isNarrowViewport) && !window.location.pathname.startsWith('/mobile')) {
+        window.location.replace('/mobile/');
+      }
+    })();
+  </script>
 </head>
 <body>
   <div class="app">
@@ -58,6 +69,7 @@
           <div id="global-search-results" class="search-results hidden"></div>
         </div>
         <div class="topbar-actions">
+          <button class="btn" id="switch-mobile-btn" style="background:#eef3ff;color:#004ac6;border-color:#c5d3f5;" title="Switch to Mobile PWA">📱 Mobile View</button>
           <button class="btn btn-sync" id="sync-btn" title="Sync across devices">⇄ Sync</button>
           <button class="btn btn-install hidden" id="install-btn" title="Install as app">⬇ Install App</button>
         </div>

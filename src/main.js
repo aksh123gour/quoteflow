@@ -18,7 +18,15 @@ if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.p
   }).catch(() => {});
 }
 
-// 3. Setup PWA Install Prompt
+// 3. Setup Mobile Switcher & PWA Install Prompt
+const switchMobileBtn = document.getElementById('switch-mobile-btn');
+if (switchMobileBtn) {
+  switchMobileBtn.addEventListener('click', () => {
+    localStorage.setItem('quoteflow_mode_preference', 'mobile');
+    window.location.href = '/mobile/';
+  });
+}
+
 let deferredPrompt = null;
 const installBtn = document.getElementById('install-btn');
 
